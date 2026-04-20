@@ -1,27 +1,60 @@
-// Klíčové změny v logice (přidejte do update funkce):
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Deep Sea Angler - Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser-arcade-physics.min.js"></script>
+    <style>
+        body { margin: 0; background: #0a1520; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        canvas { border: 4px solid #34495e; border-radius: 10px; }
+    </style>
+</head>
+<body>
 
-function update() {
-    // 1. Loď ovládá horizontální pozici
-    boat.x = Phaser.Math.Linear(boat.x, this.input.x, 0.05);
+<script>
+const config = {
+    type: Phaser.AUTO,
+    width: 600,
+    height: 700,
+    physics: {
+        default: 'arcade',
+        arcade: { debug: false }
+    },
+    scene: { preload: preload, create: create, update: update }
+};
 
-    // 2. Háček následuje loď, ale klesá podle hloubky myši
-    // Čím níže je kurzor, tím hlouběji je háček
-    let targetY = Phaser.Math.Clamp(this.input.y, 100, 650);
-    hook.y = Phaser.Math.Linear(hook.y, targetY, 0.1);
-    hook.x = boat.x;
+const game = new Phaser.Game(config);
 
-    // 3. Vlasec se nyní vlní (fyzikální efekt)
-    drawWavyLine(boat.x, 50, hook.x, hook.y);
-}
+let boat, hook, fishGroup, lineGraphics, scoreText;
+let caughtFish = null;
+let score = 0;
 
-function catchFish(hook, fish) {
-    // Ryba se "přichytí" na háček a vytahujete ji nahoru
-    fish.body.enable = false;
-    fish.x = hook.x;
-    fish.y = hook.y;
+function preload() {
+    let g = this.make.graphics();
     
-    if (hook.y < 80) { // Pokud ji vytáhnete k lodi
-        score += fish.value;
-        fish.destroy();
-    }
+    // Loď
+    g.fillStyle(0x5d4037).fillRect(0, 10, 100, 25);
+    g.fillStyle(0x3e2723).fillRect(30, 0, 40, 10);
+    g.generateTexture('boat', 100, 35);
+    
+    // Háček (tvar kotvy)
+    g.clear().lineStyle(3, 0xbdc3c7).strokePoints([{x:0,y:0},{x:0,y:15},{x:-8,y:10},{x:0,y:15},{x:8,y:10}]);
+    g.generateTexture('hook', 20, 20);
+    
+    // Ryba (modrá - běžná)
+    g.clear().fillStyle(0x3498db).fillEllipse(20, 10, 40, 20);
+    g.fillStyle(0x2980b9).fillTriangle(0, 10, 10, 0, 10, 20); // ocas
+    g.fillStyle(0xffffff).fillCircle(30, 7, 3); // oko
+    g.generateTexture('fish', 45, 20);
+
+    // Zlatá ryba (velká - vzácná)
+    g.clear().fillStyle(0xf1c40f).fillEllipse(25, 15, 50, 30);
+    g.fillStyle(0xd4ac0d).fillTriangle(0, 15, 12, 0, 12, 30);
+    g.fillStyle(0xffffff).fillCircle(35, 10, 4);
+    g.generateTexture('goldfish', 55, 30);
 }
+
+function create() {
+    // Pozadí s atmosférou (Hladina -> Temnota)
+    let sky = this.add.graphics();
+    sky.fillGradientStyle(0x87ceeb, 0x87ceeb, 0x1b4f72, 0x1b4f72, 1
