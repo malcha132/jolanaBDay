@@ -2,11 +2,11 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Deep Sea Angler - Pro</title>
+    <title>Deep Sea Angler - Opraveno</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser-arcade-physics.min.js"></script>
     <style>
         body { margin: 0; background: #0a1520; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        canvas { border: 4px solid #34495e; border-radius: 10px; }
+        canvas { border: 4px solid #fff; }
     </style>
 </head>
 <body>
@@ -23,38 +23,60 @@ const config = {
     scene: { preload: preload, create: create, update: update }
 };
 
-const game = new Phaser.Game(config);
+new Phaser.Game(config);
 
 let boat, hook, fishGroup, lineGraphics, scoreText;
 let caughtFish = null;
 let score = 0;
 
 function preload() {
-    let g = this.make.graphics();
-    
-    // Loď
-    g.fillStyle(0x5d4037).fillRect(0, 10, 100, 25);
-    g.fillStyle(0x3e2723).fillRect(30, 0, 40, 10);
-    g.generateTexture('boat', 100, 35);
-    
-    // Háček (tvar kotvy)
-    g.clear().lineStyle(3, 0xbdc3c7).strokePoints([{x:0,y:0},{x:0,y:15},{x:-8,y:10},{x:0,y:15},{x:8,y:10}]);
-    g.generateTexture('hook', 20, 20);
-    
-    // Ryba (modrá - běžná)
-    g.clear().fillStyle(0x3498db).fillEllipse(20, 10, 40, 20);
-    g.fillStyle(0x2980b9).fillTriangle(0, 10, 10, 0, 10, 20); // ocas
-    g.fillStyle(0xffffff).fillCircle(30, 7, 3); // oko
-    g.generateTexture('fish', 45, 20);
-
-    // Zlatá ryba (velká - vzácná)
-    g.clear().fillStyle(0xf1c40f).fillEllipse(25, 15, 50, 30);
-    g.fillStyle(0xd4ac0d).fillTriangle(0, 15, 12, 0, 12, 30);
-    g.fillStyle(0xffffff).fillCircle(35, 10, 4);
-    g.generateTexture('goldfish', 55, 30);
+    // Vytvoříme jednoduchý bílý čtverec, který pak obarvíme, aby se nestalo, že se nic nenačte
+    let rect = this.make.graphics().fillStyle(0xffffff).fillRect(0, 0, 32, 32);
+    rect.generateTexture('pixel', 32, 32);
 }
 
 function create() {
-    // Pozadí s atmosférou (Hladina -> Temnota)
-    let sky = this.add.graphics();
-    sky.fillGradientStyle(0x87ceeb, 0x87ceeb, 0x1b4f72, 0x1b4f72, 1
+    // Pozadí
+    this.add.graphics().fillGradientStyle(0x4488ff, 0x4488ff, 0x001133, 0x001133, 1).fillRect(0, 0, 600, 700);
+    
+    lineGraphics = this.add.graphics();
+
+    // Ryby
+    fishGroup = this.physics.add.group();
+    for (let i = 0; i < 15; i++) {
+        spawnFish(this);
+    }
+
+    // Loď - hnědý obdélník
+    boat = this.add.rectangle(300, 80, 100, 30, 0x8B4513);
+    this.physics.add.existing(boat);
+
+    // Háček - malý bílý čtvereček
+    hook = this.add.rectangle(300, 150, 15, 15, 0xbdc3c7);
+    this.physics.add.existing(hook);
+
+    scoreText = this.add.text(20, 20, 'VÝDĚLEK: 0$', { fontSize: '24px', fill: '#fff' });
+
+    // Kolize háčku a ryb
+    this.physics.add.overlap(hook, fishGroup, (h, f) => {
+        if (!caughtFish) {
+            caughtFish = f;
+            f.body.setVelocity(0, 0);
+        }
+    });
+}
+
+function update() {
+    let pointer = this.input.activePointer;
+
+    // Pohyb lodi
+    boat.x = Phaser.Math.Linear(boat.x, pointer.x || 300, 0.1);
+
+    // Háček následuje loď a klesá podle myši
+    hook.x = boat.x;
+    let targetY = Phaser.Math.Clamp(pointer.y, 110, 680);
+    hook.y = Phaser.Math.Linear(hook.y, targetY, 0.1);
+
+    // Vlasec
+    lineGraphics.clear();
+    lineGraphics.lineStyle(2
