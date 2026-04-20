@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Super Zen Fishing 2.0 - Deep Sea</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser-arcade-physics.min.js"></script>
+    <style>
+        body { margin: 0; background: #1a2a3a; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        canvas { border: 6px solid #34495e; box-shadow: 0 0 30px rgba(0,0,0,0.5); border-radius: 15px; }
+    </style>
+</head>
+<body>
+
+<script>
+const config = {
+    type: Phaser.AUTO,
+    width: 500,
+    height: 700,
+    physics: {
+        default: 'arcade',
+        arcade: { debug: false }
+    },
+    scene: { preload: preload, create: create, update: update }
+};
+
+const game = new Phaser.Game(config);
+
+let boat, hook, fishGroup, lineGraphics, scoreText;
+let score = 0;
+let isLowering = false;
+let isRetracting = false;
+const HOOK_SPEED = 400;
+
+function preload() {
+    let g = this.make.graphics();
+    
+    // Loďka (nahoře)
+    g.fillStyle(0x8B4513).fillRect(0, 10, 80, 20);
+    g.fillStyle(0xA0522D).fillRect(20, 0, 40, 10); // Kajuta
+    g.generateTexture('boat', 80, 30);
+    
+    // Háček
+    g.clear().lineStyle(3, 0xbdc3c7).strokeCircle(10, 10, 8);
+    g.generateTexture('hook', 20, 20);
+    
+    // Ryba (plave rychle)
+    g.clear().fillStyle(0x3498db).fillEllipse(15, 10, 30, 15);
+    g.fillStyle(0xffffff).fillCircle(25, 8, 2);
+    g.generateTexture('fish', 30, 20);
+
+    // Zlatá ryba
+    g.clear().fillStyle(0xffd700).fillEllipse(15, 10, 30, 15);
+    g.generateTexture('goldfish', 30, 20);
+}
+
+function create() {
+    // Pozadí (hladina -> hloubka)
+    this.add.graphics().fillGradientStyle(0x5dade2, 0x5dade2, 0x1b4f72, 0x1b4f72, 1).fillRect(0, 0, 500, 700);
+
+    // Vykreslování vlasce
+    lineGraphics = this.add.graphics();
+
+    // Ryby
+    fishGroup = this.physics.add.group();
+    this.time.addEvent({
+        delay: 800,
+        callback: spawnFish,
+        callbackScope: this,
+        loop: true
+    });
+
+    // Loďka
+    boat = this.add.image(250, 40, 'boat');
+
+    // Háček
+    hook = this.physics.add.image(250, 60, 'hook');
+    hook.setCircle(8);
+
+    // Kolize
+    this.physics.add.overlap(hook, fishGroup, catchFish, null, this);
+
+    scoreText = this.add.text(20, 20, 'ÚLOVEK: 0kg', { 
+        fontSize: '24px', fill: '#fff', fontStyle: 'bold', stroke: '#000', strokeThickness: 4 
+    });
+
+    // Ovládání - kliknutí spustí háček
+    this.input.on('pointerdown', () => {
+        if (!isLowering && !isRetracting) isLowering = true;
+    });
+}
+
+function update() {
+    // Pohyb lodi za myší (jen v horní části)
+    if (!isLowering && !isRetracting) {
+        boat.x = Phaser.Math.Linear(boat.x, this.input.x || 250, 0.1);
+        hook.x = boat.x;
+        hook.y = 60;
+    }
+
+    // Mechanika háčku
+    if (isLowering) {
+        hook.setVelocityY(HOOK_SPEED);
+        if (hook.y > 650) {
+            isLowering = false;
+            isRetracting = true;
+        }
+    } else if (isRetracting) {
+        hook.setVelocityY(-HOOK_SPEED);
+        if (hook.y <= 60) {
+            hook.setVelocityY(0);
+            hook.y = 60;
+            isRetracting = false;
+        }
+    }
+
+    // Vykreslení vlasce od lodi k háčku
+    lineGraphics.clear();
+    lineGraphics.lineStyle(2, 0xffffff, 0.5);
+    lineGraphics.lineBetween(boat.x, 50, hook.x, hook.y);
+
+    // Odstranění ryb mimo obrazovku
+    fishGroup.getChildren().forEach(fish => {
+        if (fish.x < -50 || fish.x > 550) fish.destroy();
+    });
+}
+
+function spawnFish() {
+    const y = Phaser.Math.Between(150, 600);
+    const side = Phaser.Math.Between(0, 1);
+    const x = side === 0 ? -30 : 530;
+    const speed = Phaser.Math.Between(150, 350);
+    const type = Phaser.Math.Between(0, 10) > 8 ? 'goldfish' : 'fish';
+
+    const fish = fishGroup.create(x, y, type);
+    fish.setVelocityX(side === 0 ? speed : -speed);
+    if (side === 1) fish.flipX = true;
+}
+
+function catchFish(hook, fish) {
+    // Můžeme chytat jen když jde háček dolů nebo je v pohybu
+    if (!isRetracting) {
+        fish.destroy();
+        score += (fish.texture.key === 'goldfish') ? 50 : 10;
+        scoreText.setText('ÚLOVEK: ' + score + 'kg');
+        
+        // Po chycení se háček hned vrací
+        isLowering = false;
+        isRetracting = true;
+        
+        // Efekt
+        this.cameras.main.shake(100, 0.01);
+    }
+}
+</script>
+
+</body>
+</html>
