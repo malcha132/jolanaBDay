@@ -566,44 +566,129 @@ function loop() {
         // ... (zbytek vykreslování v loopu)
     }
 
+ function move(e) {
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    targetX = x;
+    
     if (gameState === 'FLY') {
-        let active = 0;
         caughtFishes.forEach(f => {
-            // Gravitace je mírnější (0.02 místo 0.04), aby ryby "plachtily"
-            f.x += f.vx; f.y += f.vy; f.vy += 0.08; 
-            
-            // Odraz od stěn, aby neutekly z obrazu
-            if (f.x < 20 || f.x > width - 20) f.vx *= -1;
+            // Kontrola, zda už ryba nebyla chycena (y < 5000) a zda je klik v dosahu
+            if (f.y < height && Math.hypot(x - f.x, y - f.y) < 70) {
+                f.y = 9999; // Odstřelíme ji z obrazu
+                money += 10;
+                moneyEl.innerText = money;
+                flashes.push({ x: f.x, y: f.y, color: f.color, age: 0 });
+            }
+        });
+    }
+}
 
-            if (f.y < height + 100) {
-                drawFish(f.x, f.y, f.size, f.color, f.vx < 0);
-                active++;
+window.addEventListener('touchstart', move);
+window.addEventListener('touchmove', move);
+window.addEventListener('mousedown', move);
+window.addEventListener('mousemove', move);
+
+function loop() {
+    if (gameState === 'START') return;
+    time++;
+
+    drawBackground();
+
+    if (gameState === 'DOWN' || gameState === 'UP') {
+        hook.x += (targetX - hook.x) * 0.14;
+
+        if (gameState === 'DOWN') {
+            hook.y += hook.speed;
+            depthEl.innerText = Math.floor(hook.y / 10);
+            fishes.forEach(f => {
+                if (Math.hypot(hook.x - f.x, hook.y - f.y) < f.size + 4) gameState = 'UP';
+            });
+            if (hook.y > 8500) gameState = 'UP';
+        } else {
+            hook.y -= hook.speed * 0.9;
+            fishes.forEach(f => {
+                if (!f.caught && Math.hypot(hook.x - f.x, hook.y - f.y) < 42) {
+                    f.caught = true;
+                    caughtFishes.push(f);
+                    flashes.push({ x: f.x, y: f.y, color: f.color, age: 0 });
+                    money += 5;
+                    moneyEl.innerText = money;
+                }
+            });
+            
+            // PŘECHOD DO FÁZE FLY
+            if (hook.y < 50) {
+                gameState = 'FLY';
+                caughtFishes.forEach((f, index) => {
+                    f.x = width / 2; 
+                    f.y = height - 100;
+                    f.vx = (Math.random() - 0.5) * 4; 
+                    f.vy = -Math.random() * 4 - 8 - (index * 0.5); 
+                });
+            }
+        }
+
+        ctx.save();
+        ctx.translate(0, -hook.y + height / 2);
+        drawLightRays();
+        drawCorals();
+        drawSeaweeds();
+        updateBubbles();
+        drawSurface();
+        drawBoat();
+        updateFlashes();
+
+        fishes.forEach(f => {
+            if (!f.caught) {
+                f.x += f.speed;
+                if (f.x > width + 130) f.x = -130;
+                if (f.x < -130) f.x = width + 130;
+                drawFish(f.x, f.y, f.size, f.color, f.speed < 0);
             }
         });
 
-        if (active === 0) {
+        const rodTipX = width / 2 + ROD_TIP_OFFSET_X;
+        ctx.strokeStyle = 'rgba(200, 225, 255, 0.7)';
+        ctx.lineWidth = 1.2;
+        drawWavyLine(rodTipX, ROD_TIP_Y, hook.x, hook.y);
+        drawHook(hook.x, hook.y);
+        ctx.restore();
+    }
+
+    if (gameState === 'FLY') {
+        let activeCount = 0;
+        caughtFishes.forEach(f => {
+            if (f.y < height + 50) { // Počítáme jen ryby, co jsou ještě "ve hře"
+                f.x += f.vx; 
+                f.y += f.vy; 
+                f.vy += 0.08; 
+                
+                if (f.x < 20 || f.x > width - 20) f.vx *= -1;
+                drawFish(f.x, f.y, f.size, f.color, f.vx < 0);
+                activeCount++;
+            }
+        });
+
+        if (activeCount === 0) {
             gameState = 'START';
             msgEl.style.display = 'flex';
             msgEl.innerHTML = `
                 <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; text-align: center;">
                     <h1 style="font-size: 28px; line-height: 1.2; margin-bottom: 5px;">GRATULUJI,<br>JOLANO!</h1>
                     <p class="sub" style="margin-bottom: 20px;">JSI VÝBORNÁ RYBÁŘKA</p>
-                    
                     <div style="margin-bottom: 25px;">
-                        <p style="color:#88ccff; font-size:12px; letter-spacing:2px; margin:0;">SKÓRE</p>
+                        <p style="color:#88ccff; font-size:12px; letter-spacing:2px; margin:0;">CELKOVÉ SKÓRE</p>
                         <p style="font-size:58px; color:#ffee00; text-shadow:0 0 15px #ffee00; margin:0; font-family:'Courier New',monospace; font-weight:bold;">${money}</p>
                     </div>
-
                     <p style="color:#fff; font-size:14px; letter-spacing:1px; line-height: 1.5; margin-bottom: 35px; text-shadow: 0 0 5px #00ffcc;">
                         PŘEJEME HODNĚ ŠTĚSTÍ<br>U VODY :-)
                     </p>
-                    
                     <button onclick="location.reload()" style="white-space: nowrap;">&#9654; ZNOVU</button>
                 </div>
             `;
         }
     }
-
     requestAnimationFrame(loop);
 }
 </script>
