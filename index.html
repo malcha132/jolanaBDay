@@ -198,4 +198,42 @@ function loop() {
                 f.halves.forEach((h, i) => {
                     h.x += h.vx; h.y += h.vy; h.vy += 0.5;
                     ctx.save();
-                    ctx
+                    ctx.translate(h.x, h.y); ctx.rotate(h.rot * h.y * 0.1);
+                    ctx.translate(-h.x, -h.y);
+                    drawFish(h, i === 0);
+                    ctx.restore();
+                    if (h.y < height + 100) active++;
+                });
+            }
+        });
+
+        // Kreslení stopy mačety
+        ctx.beginPath();
+        ctx.strokeStyle = "#ff00aa"; ctx.lineWidth = 4;
+        for(let i=1; i<trail.length; i++) {
+            ctx.globalAlpha = 1 - (trail[i].age / 20);
+            ctx.moveTo(trail[i-1].x, trail[i-1].y);
+            ctx.lineTo(trail[i].x, trail[i].y);
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        trail.forEach(t => t.age++);
+        trail = trail.filter(t => t.age < 20);
+
+        if (active === 0) {
+            gameState = 'START';
+            msgEl.style.display = 'flex';
+            msgEl.innerHTML = `
+                <h1>GRATULUJI JOLANO!</h1>
+                <p class="sub">SI VÝBORNÁ RYBÁŘKA</p>
+                <p style="font-size:32px; color:#ffee00;">SKÓRE: ${money}</p>
+                <p>Přejeme hodně štěstí u vody :-)</p>
+                <button onclick="location.reload()">HRÁT ZNOVU</button>
+            `;
+        }
+    }
+    requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
