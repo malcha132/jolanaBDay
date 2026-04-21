@@ -3,23 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Jolana Fishing Pro</title>
+    <title>Jolana's Neon Fisher</title>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000b1a; touch-action: none; font-family: sans-serif; }
-        canvas { display: block; width: 100vw; height: 100vh; background: #0044cc; }
-        #ui { position: absolute; top: 15px; width: 100%; text-align: center; color: white; font-size: 22px; font-weight: bold; z-index: 50; pointer-events: none; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-        #msg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #000b1a; color: white; z-index: 100; }
-        h1 { color: #3498db; margin-bottom: 10px; }
-        button { padding: 20px 50px; font-size: 24px; background: #2ecc71; color: white; border: 3px solid white; border-radius: 50px; font-weight: bold; cursor: pointer; }
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            overflow: hidden; background: #000; /* Černý podklad */
+            touch-action: none; user-select: none; -webkit-user-select: none;
+            font-family: 'Courier New', Courier, monospace; /* Arkádové písmo */
+        }
+        canvas { display: block; width: 100vw; height: 100vh; }
+        
+        #ui {
+            position: absolute; top: 10px; width: 100%;
+            display: flex; justify-content: space-between; padding: 0 20px;
+            box-sizing: border-box; color: #0ff; /* Neonová modrá */
+            font-size: 20px; font-weight: bold; pointer-events: none; z-index: 50;
+            text-shadow: 0 0 10px #0ff;
+        }
+        
+        #overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center;
+            align-items: center; background: rgba(0, 0, 0, 0.85);
+            color: #fff; z-index: 100; border: 2px solid #0ff; box-sizing: border-box;
+        }
+        
+        h1 { font-size: 40px; margin-bottom: 10px; color: #f0f; text-shadow: 0 0 15px #f0f; text-transform: uppercase; }
+        p { font-size: 18px; color: #0ff; margin-bottom: 30px; text-align: center; max-width: 80%; }
+        
+        button {
+            padding: 20px 50px; font-size: 24px; font-weight: bold;
+            background: transparent; border: 4px solid #0f0; border-radius: 10px;
+            color: #0f0; cursor: pointer; text-transform: uppercase;
+            text-shadow: 0 0 10px #0f0; box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+            transition: 0.2s;
+        }
+        button:active { transform: scale(0.95); background: rgba(0, 255, 0, 0.2); }
     </style>
 </head>
 <body>
 
-<div id="ui">SKÓRE: <span id="money">0</span> | HLOUBKA: <span id="depth">0</span>m</div>
+<div id="ui">
+    <div>SCORE: <span id="score">0</span></div>
+    <div>TIME: <span id="time">60</span>s</div>
+</div>
 
-<div id="msg">
-    <h1>RYBÁŘKA JOLANA</h1>
-    <p style="margin-bottom: 30px;">Chytej ryby cestou nahoru!</p>
+<div id="overlay">
+    <h1>NEON FISHER</h1>
+    <p>PRO JOLANU<br><br>Ovládej loď prstem. Chytej neonové ryby do světelného paprsku. Vyhýbej se červeným bombám!</p>
     <button id="startBtn">START</button>
 </div>
 
@@ -29,64 +60,204 @@
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const startBtn = document.getElementById('startBtn');
-const msgEl = document.getElementById('msg');
-const moneyEl = document.getElementById('money');
-const depthEl = document.getElementById('depth');
+const overlay = document.getElementById('overlay');
+const scoreEl = document.getElementById('score');
+const timeEl = document.getElementById('time');
 
-let width, height, money = 0, gameState = 'START';
-let hook = { x: 0, y: 50, speed: 4, radius: 12 };
-let fishes = [], caughtFishes = [], targetX = 0;
-const colors = ['#FF5E5E', '#FFD95E', '#5EFF8B', '#5EADFF', '#FFFFFF'];
+let width, height, score = 0, time = 60, gameState = 'START';
+let player = { x: 0, y: 0, w: 80, h: 40, beamW: 60 };
+let fishes = [], particles = [], obstacles = [];
+let targetX = 0, gameTimer = null;
 
+// Funkce pro nastavení velikosti plátna
 function resize() {
     width = canvas.width = window.innerWidth;
     height = canvas.height = window.innerHeight;
-    hook.x = width / 2;
+    player.y = height * 0.15; // Loďka je kousek pod horním okrajem
+    player.x = width / 2;
     targetX = width / 2;
 }
 window.addEventListener('resize', resize);
 resize();
 
-function spawn() {
-    fishes = [];
-    caughtFishes = [];
-    for (let i = 0; i < 50; i++) {
-        fishes.push({
-            x: Math.random() * width,
-            y: 600 + (i * 170),
-            color: colors[Math.floor(Math.random() * colors.length)],
-            size: 16,
-            speed: (Math.random() - 0.5) * 5,
-            caught: false
+// Pomocná: Náhodné číslo v rozmezí
+const rand = (min, max) => Math.random() * (max - min) + min;
+
+// Vytvoření neonové ryby
+function spawnFish() {
+    return {
+        x: rand(50, width - 50),
+        y: height + 50,
+        size: rand(15, 30),
+        // Náhodná svítivá barva (neon modrá, zelená, žlutá, fialová)
+        color: `hsl(${[180, 120, 60, 300][Math.floor(rand(0, 4))]}, 100%, 60%)`,
+        speedY: rand(-2, -5), // Plave nahoru
+        speedX: rand(-1, 1),
+        osc: rand(0, 100) // Pro vlnivý pohyb
+    };
+}
+
+// Vytvoření bomby
+function spawnObstacle() {
+    return {
+        x: rand(50, width - 50),
+        y: height + 50,
+        size: 25,
+        color: '#ff0000', // Červená neonová
+        speedY: rand(-3, -6)
+    };
+}
+
+// Vytvoření částic po chycení
+function createParticles(x, y, color) {
+    for (let i = 0; i < 10; i++) {
+        particles.push({
+            x: x, y: y,
+            vx: rand(-5, 5), vy: rand(-5, 5),
+            radius: rand(1, 4),
+            color: color,
+            life: 30
         });
     }
 }
 
-// Funkce pro kreslení ryby s ocáskem
-function drawFish(x, y, size, color, flip) {
-    ctx.fillStyle = color;
-    // Tělo
-    ctx.beginPath();
-    ctx.ellipse(x, y, size, size/1.6, 0, 0, Math.PI*2);
-    ctx.fill();
-    // Ocas
-    ctx.beginPath();
-    let tailX = flip ? size : -size;
-    ctx.moveTo(x + tailX, y);
-    ctx.lineTo(x + tailX * 1.5, y - size/1.5);
-    ctx.lineTo(x + tailX * 1.5, y + size/1.5);
-    ctx.fill();
+// Ovládání
+function handleInput(e) {
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    targetX = clientX;
+}
+window.addEventListener('mousemove', handleInput);
+window.addEventListener('touchstart', handleInput, {passive: false});
+window.addEventListener('touchmove', handleInput, {passive: false});
+
+// START HRY
+startBtn.addEventListener('click', () => {
+    overlay.style.display = 'none';
+    gameState = 'PLAY';
+    score = 0;
+    time = 60;
+    scoreEl.innerText = score;
+    timeEl.innerText = time;
+    fishes = [];
+    obstacles = [];
+    particles = [];
+    
+    // Časovač hry
+    if (gameTimer) clearInterval(gameTimer);
+    gameTimer = setInterval(() => {
+        if (gameState === 'PLAY') {
+            time--;
+            timeEl.innerText = time;
+            if (time <= 0) endGame();
+        }
+    }, 1000);
+});
+
+function endGame() {
+    gameState = 'END';
+    clearInterval(gameTimer);
+    overlay.style.display = 'flex';
+    document.querySelector('h1').innerText = "KONEC ČASU!";
+    document.querySelector('p').innerHTML = `SKÓRE PRO JOLANU:<br><span style="font-size:30px;color:#0f0">${score}</span>`;
+    startBtn.innerText = "HRÁT ZNOVU";
 }
 
-startBtn.onclick = function() {
-    msgEl.style.display = 'none';
-    money = 0;
-    moneyEl.innerText = "0";
-    hook.y = 50;
-    spawn();
-    gameState = 'DOWN';
-    // Spuštění smyčky až po kliknutí
-    requestAnimationFrame(loop);
-};
+function update() {
+    if (gameState !== 'PLAY') return;
 
-function move(e) {
+    // Pohyb hráče (loďky)
+    player.x += (targetX - player.x) * 0.2;
+    // Omezení pohybu na obrazovku
+    if (player.x < player.w / 2) player.x = player.w / 2;
+    if (player.x > width - player.w / 2) player.x = width - player.w / 2;
+
+    // Spawnování prvků
+    if (Math.random() < 0.04) fishes.push(spawnFish());
+    if (Math.random() < 0.01) obstacles.push(spawnObstacle());
+
+    // Aktualizace ryb a kontrola chycení
+    for (let i = fishes.length - 1; i >= 0; i--) {
+        let f = fishes[i];
+        f.y += f.speedY;
+        f.x += f.speedX + Math.sin(f.osc += 0.05) * 2;
+
+        // Kontrola chycení do paprsku
+        if (f.y < player.y + height && f.y > player.y &&
+            f.x > player.x - player.beamW / 2 && f.x < player.x + player.beamW / 2) {
+            
+            // Ryba je chycena!
+            createParticles(f.x, f.y, f.color);
+            score += 100;
+            scoreEl.innerText = score;
+            fishes.splice(i, 1); // Odstranit rybu
+            continue;
+        }
+
+        // Odstranit rybu, pokud odplave pryč
+        if (f.y < -50) fishes.splice(i, 1);
+    }
+
+    // Aktualizace bomb
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+        let o = obstacles[i];
+        o.y += o.speedY;
+
+        // Kontrola zásahu bombou
+        if (o.y < player.y + height && o.y > player.y &&
+            o.x > player.x - player.beamW / 2 && o.x < player.x + player.beamW / 2) {
+            
+            // Bomba aktivována!
+            createParticles(o.x, o.y, '#ff0000');
+            score = Math.max(0, score - 500); // Ztráta bodů
+            scoreEl.innerText = score;
+            obstacles.splice(i, 1);
+            continue;
+        }
+        if (o.y < -50) obstacles.splice(i, 1);
+    }
+
+    // Aktualizace částic
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx; p.y += p.vy; p.life--;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+}
+
+function draw() {
+    // Černý podklad pro neonové efekty
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, width, height);
+
+    if (gameState === 'PLAY') {
+        // --- VYKRESLENÍ PAPRSKU ---
+        ctx.save();
+        // Záře paprsku
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = 'rgba(0, 255, 255, 0.5)';
+        ctx.fillStyle = 'rgba(0, 255, 255, 0.15)';
+        ctx.fillRect(player.x - player.beamW / 2, player.y, player.beamW, height);
+        // Okraje paprsku
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(player.x - player.beamW / 2, player.y, player.beamW, height);
+        ctx.restore();
+
+        // --- VYKRESLENÍ LOĎKY ---
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#0f0';
+        ctx.strokeStyle = '#0f0';
+        ctx.lineWidth = 3;
+        // Jednoduchý neonový tvar loďky
+        ctx.beginPath();
+        ctx.moveTo(-player.w/2, 0);
+        ctx.lineTo(player.w/2, 0);
+        ctx.lineTo(player.w/2 - 10, player.h);
+        ctx.lineTo(-player.w/2 + 10, player.h);
+        ctx.closePath();
+        ctx.stroke();
+        // Kabina
+        ctx.beginPath();
+        ctx.arc(0, 0, 15, Math.PI,
