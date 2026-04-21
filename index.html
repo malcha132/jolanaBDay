@@ -562,10 +562,14 @@ function loop() {
             gameState = 'START';
             msgEl.style.display = 'flex';
             msgEl.innerHTML = `
-                <h1>KONEC LOVU</h1>
-                <p class="sub">CELKOVÉ SKÓRE</p>
-                <p style="font-size:52px;color:#ffee00;text-shadow:0 0 16px #ffee00;margin:10px 0 40px;font-family:'Courier New',monospace;letter-spacing:4px;">${money}</p>
-                <button onclick="location.reload()">&#9654; ZNOVU</button>
+                <h1 style="font-size:32px;">GRATULUJI, JOLANO!</h1>
+                <p class="sub">JSI VÝBORNÁ RYBÁŘKA</p>
+                <div style="margin: 20px 0; text-align: center;">
+                    <p style="color:#88ccff; font-size:14px; letter-spacing:2px; margin-bottom:10px;">TVOJE SKÓRE:</p>
+                    <p style="font-size:64px; color:#ffee00; text-shadow:0 0 20px #ffee00; margin:0; font-family:'Courier New',monospace; letter-spacing:4px; font-weight:bold;">${money}</p>
+                </div>
+                <p style="color:#00ffcc; font-size:16px; letter-spacing:2px; margin-bottom:40px; text-align:center; max-width: 80%;">PŘEJEME HODNĚ ŠTĚSTÍ U VODY :-)</p>
+                <button onclick="location.reload()">&#9654; ZNOVU NA LOV</button>
             `;
         }
     }
