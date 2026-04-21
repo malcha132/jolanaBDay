@@ -558,18 +558,26 @@ function loop() {
                 active++;
             }
         });
-    if (active === 0) {
+  if (active === 0) {
             gameState = 'START';
             msgEl.style.display = 'flex';
+            // Přidané styly přímo do HTML pro zajištění perfektního centrování na mobilu
             msgEl.innerHTML = `
-                <h1 style="font-size:32px;">GRATULUJI, JOLANO!</h1>
-                <p class="sub">JSI VÝBORNÁ RYBÁŘKA</p>
-                <div style="margin: 20px 0; text-align: center;">
-                    <p style="color:#88ccff; font-size:14px; letter-spacing:2px; margin-bottom:10px;">TVOJE SKÓRE:</p>
-                    <p style="font-size:64px; color:#ffee00; text-shadow:0 0 20px #ffee00; margin:0; font-family:'Courier New',monospace; letter-spacing:4px; font-weight:bold;">${money}</p>
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; text-align: center;">
+                    <h1 style="font-size: 28px; line-height: 1.2; margin-bottom: 5px;">GRATULUJI,<br>JOLANO!</h1>
+                    <p class="sub" style="margin-bottom: 20px;">JSI VÝBORNÁ RYBÁŘKA</p>
+                    
+                    <div style="margin-bottom: 25px;">
+                        <p style="color:#88ccff; font-size:12px; letter-spacing:2px; margin:0;">SKÓRE</p>
+                        <p style="font-size:58px; color:#ffee00; text-shadow:0 0 15px #ffee00; margin:0; font-family:'Courier New',monospace; font-weight:bold;">${money}</p>
+                    </div>
+
+                    <p style="color:#fff; font-size:14px; letter-spacing:1px; line-height: 1.5; margin-bottom: 35px; text-shadow: 0 0 5px #00ffcc;">
+                        PŘEJEME HODNĚ ŠTĚSTÍ<br>U VODY :-)
+                    </p>
+                    
+                    <button onclick="location.reload()" style="white-space: nowrap;">&#9654; ZNOVU</button>
                 </div>
-                <p style="color:#00ffcc; font-size:16px; letter-spacing:2px; margin-bottom:40px; text-align:center; max-width: 80%;">PŘEJEME HODNĚ ŠTĚSTÍ U VODY :-)</p>
-                <button onclick="location.reload()">&#9654; ZNOVU NA LOV</button>
             `;
         }
     }
