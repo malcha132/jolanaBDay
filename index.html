@@ -3,128 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fishing Game for Jolana</title>
+    <title>Jolana Arcade Fishing</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #001a33; font-family: sans-serif; color: white; touch-action: none; }
-        canvas { display: block; background: linear-gradient(#0055ff, #001a33); width: 100vw; height: 100vh; }
-        #ui { position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; font-size: 20px; font-weight: bold; }
-        #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; font-size: 24px; background: rgba(0,0,0,0.6); padding: 20px; border-radius: 10px; width: 80%; border: 2px solid white; }
-        button { padding: 15px 30px; font-size: 20px; background: #28a745; color: white; border: none; border-radius: 5px; font-weight: bold; margin-top: 15px; }
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            overflow: hidden; background: #000a1a; 
+            touch-action: none; user-select: none; -webkit-user-select: none;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        canvas { display: block; width: 100vw; height: 100vh; background: #0044cc; }
+        #overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center;
+            align-items: center; background: #000a1a;
+            color: white; z-index: 100;
+        }
+        button {
+            padding: 20px 50px; font-size: 28px; font-weight: bold;
+            background: #28a745; border: 4px solid white; border-radius: 10px;
+            color: white; cursor: pointer; text-transform: uppercase;
+        }
+        #ui {
+            position: absolute; top: 15px; width: 100%;
+            text-align: center; color: white;
+            font-size: 22px; pointer-events: none; z-index: 50; text-shadow: 2px 2px #000;
+        }
     </style>
 </head>
 <body>
 
-<div id="ui">SCORE: <span id="money">0</span> | <span id="depth">0</span>m</div>
-<div id="msg">
-    RYBÁŘKA JOLANA<br>
-    <small>Uhýbej rybám, cestou zpět je chytej!</small><br>
+<div id="ui">SCORE: <span id="money">0</span> | DEPTH: <span id="depth">0</span>m</div>
+
+<div id="overlay">
+    <h1 style="margin-bottom: 5px; font-size: 40px; color: #ffff00;">JOLANA FISH</h1>
+    <p style="margin-bottom: 30px; color: #ffffff;">ARKÁDOVÝ LOV</p>
     <button id="startBtn">START</button>
 </div>
+
 <canvas id="game"></canvas>
 
 <script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+const startBtn = document.getElementById('startBtn');
+const overlay = document.getElementById('overlay');
 const moneyEl = document.getElementById('money');
 const depthEl = document.getElementById('depth');
-const msgEl = document.getElementById('msg');
-const startBtn = document.getElementById('startBtn');
 
 let width, height, money = 0, gameState = 'START';
-let hook = { x: 0, y: 50, speed: 4, radius: 10 };
+let hook = { x: 0, y: 50, speed: 4, radius: 10 }; 
 let fishes = [], caughtFishes = [], targetX = 0;
-const colors = ['#ff0000', '#ffff00', '#00ff00', '#00ffff', '#ffffff'];
+let animationStarted = false;
 
-function init() {
+// Arkádová paleta (bez růžové)
+const arcadeColors = ['#ff0000', '#ffff00', '#00ff00', '#00ffff', '#ffffff'];
+
+function resize() {
     width = canvas.width = window.innerWidth;
     height = canvas.height = window.innerHeight;
     hook.x = width / 2;
     targetX = width / 2;
 }
-window.addEventListener('resize', init);
-init();
 
-startBtn.onclick = function() {
-    gameState = 'DOWN';
-    msgEl.style.display = 'none';
-    money = 0;
-    moneyEl.innerText = "0";
-    hook.y = 50;
-    caughtFishes = [];
-    fishes = [];
-    for (let i = 0; i < 50; i++) {
-        fishes.push({
-            x: Math.random() * width,
-            y: 500 + i * 150,
-            color: colors[Math.floor(Math.random() * colors.length)],
-            size: 15,
-            speed: (Math.random() - 0.5) * 4,
-            caught: false
-        });
-    }
-};
+window.addEventListener('resize', resize);
+resize();
 
-function handleInput(e) {
-    const x = e.touches ? e.touches[0].clientX : e.clientX;
-    const y = e.touches ? e.touches[0].clientY : e.clientY;
-    targetX = x;
-    if (gameState === 'FLY') {
-        caughtFishes.forEach(f => {
-            if (Math.hypot(x - f.x, y - f.y) < 50) {
-                f.y = 9000;
-                money += 10;
-                moneyEl.innerText = money;
-            }
-        });
-    }
+function drawFish(x, y, size, color, isFlipped) {
+    ctx.fillStyle = color;
+    // Tělo
+    ctx.fillRect(x - size/2, y - size/4, size, size/2);
+    // Ocas
+    let t = isFlipped ? size/2 : -size/2;
+    ctx.beginPath();
+    ctx.moveTo(x + t, y);
+    ctx.lineTo(x + t*2, y - size/2);
+    ctx.lineTo(x + t*2, y + size/2);
+    ctx.fill();
+    // Oko
+    ctx.fillStyle = "black";
+    ctx.fillRect(x - t/1.2, y - 2, 3, 3);
 }
-window.addEventListener('mousemove', handleInput);
-window.addEventListener('touchstart', handleInput);
-window.addEventListener('touchmove', handleInput);
 
-function loop() {
-    ctx.clearRect(0, 0, width, height);
-
-    if (gameState === 'DOWN' || gameState === 'UP') {
-        hook.x += (targetX - hook.x) * 0.1;
-
-        if (gameState === 'DOWN') {
-            hook.y += hook.speed;
-            depthEl.innerText = Math.floor(hook.y / 10);
-            fishes.forEach(f => {
-                if (Math.hypot(hook.x - f.x, hook.y - f.y) < f.size) gameState = 'UP';
-            });
-            if (hook.y > 8000) gameState = 'UP';
-        } else {
-            hook.y -= hook.speed * 2;
-            fishes.forEach(f => {
-                if (!f.caught && Math.hypot(hook.x - f.x, hook.y - f.y) < 30) {
-                    f.caught = true;
-                    caughtFishes.push(f);
-                }
-            });
-            if (hook.y < 50) {
-                gameState = 'FLY';
-                caughtFishes.forEach(f => {
-                    f.x = width / 2; f.y = height - 50;
-                    f.vx = (Math.random() - 0.5) * 12;
-                    f.vy = -Math.random() * 8 - 4;
-                });
-            }
-        }
-
-        ctx.save();
-        ctx.translate(0, -hook.y + height / 2);
-        ctx.strokeStyle = "white";
-        ctx.beginPath();
-        ctx.moveTo(width / 2, 0);
-        ctx.lineTo(hook.x, hook.y);
-        ctx.stroke();
-        ctx.fillStyle = "silver";
-        ctx.beginPath();
-        ctx.arc(hook.x, hook.y, hook.radius, 0, Math.PI * 2);
-        ctx.fill();
-
-        fishes.forEach(f => {
-            if (!f.caught) {
-                f.x += f.speed;
+startBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    overlay.style.display = 'none';
+    gameState = 'DOWN';
+    money = 0;
+    moneyEl.innerText = money;
