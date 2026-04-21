@@ -549,7 +549,7 @@ function loop() {
         ctx.restore();
     }
 
- if (gameState === 'FLY') {
+if (gameState === 'FLY') {
         let active = 0;
         
         // 1. Logika pohybu a sekání ryb
@@ -597,14 +597,15 @@ function loop() {
             // Vyčištění starých bodů stopy
             trail = trail.filter(p => p.age < 15);
         }
-       });
-        if (active === 0) {
+
+        // 3. Ukončení hry, když všechno spadne
+        if (active === 0 && caughtFishes.length > 0) {
             gameState = 'START';
             msgEl.style.display = 'flex';
             msgEl.innerHTML = `
                 <h1>Gratulujeme Jolano, si výborná rybářka</h1>
                 <p class="sub">CELKOVÉ SKÓRE</p>
-                <p style="font-size:52px;color:#ffee00;text-shadow:0 0 16px #ffee00;margin:10px 0 40px;font-family:'Courier New',monospace;letter-spacing:4px;">${money}</p>
+                <p style="font-size:52px;color:#ffee00;text-shadow:0 0 16px #ffee00;margin:10px 0 40px;">${money}</p>
                 <button onclick="location.reload()">&#9654; ZNOVU</button>
             `;
         }
