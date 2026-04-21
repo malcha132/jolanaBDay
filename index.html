@@ -3,13 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Jolana Fishing Pro - Machete Cut</title>
+    <title>Jolana Fishing Pro</title>
     <style>
         * { box-sizing: border-box; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000c1f; touch-action: none; font-family: 'Courier New', monospace; }
-        canvas { display: block; width: 100vw; height: 100vh; z-index: 10; }
-        
-        /* Styl pro UI prvků */
+        canvas { display: block; width: 100vw; height: 100vh; }
         #ui {
             position: absolute; top: 18px; width: 100%; text-align: center;
             color: #00ffcc; font-size: 20px; font-weight: bold; z-index: 50;
@@ -21,18 +19,225 @@
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             background: #000c1f; color: white; z-index: 100;
         }
-        h1 { font-family: 'Courier New', monospace; font-size: 42px; letter-spacing: 6px; color: #ff00aa; margin-bottom: 8px; text-shadow: 0 0 10px #ff00aa, 0 0 30px #ff00aa88; text-align: center; }
-        .sub { color: #00ffcc; letter-spacing: 4px; font-size: 14px; margin-bottom: 40px; text-shadow: 0 0 8px #00ffcc; text-align: center; }
-        button { padding: 18px 55px; font-size: 22px; font-family: 'Courier New', monospace; background: transparent; color: #ff00aa; letter-spacing: 4px; border: 2px solid #ff00aa; border-radius: 4px; font-weight: bold; cursor: pointer; text-shadow: 0 0 8px #ff00aa; box-shadow: 0 0 12px #ff00aa88, inset 0 0 12px #ff00aa22; transition: all 0.15s; z-index: 110; }
+        h1 { font-family: 'Courier New', monospace; font-size: 42px; letter-spacing: 6px; color: #ff00aa; margin-bottom: 8px; text-shadow: 0 0 10px #ff00aa, 0 0 30px #ff00aa88; text-align: center;}
+        .sub { color: #00ffcc; letter-spacing: 4px; font-size: 14px; margin-bottom: 40px; text-shadow: 0 0 8px #00ffcc; text-align: center;}
+        button { padding: 18px 55px; font-size: 22px; font-family: 'Courier New', monospace; background: transparent; color: #ff00aa; letter-spacing: 4px; border: 2px solid #ff00aa; border-radius: 4px; font-weight: bold; cursor: pointer; text-shadow: 0 0 8px #ff00aa; box-shadow: 0 0 12px #ff00aa88, inset 0 0 12px #ff00aa22; transition: all 0.15s; }
         button:hover { background: #ff00aa22; box-shadow: 0 0 24px #ff00aacc, inset 0 0 20px #ff00aa44; }
+    </style>
+</head>
+<body>
+<div id="ui">SKÓRE: <span id="money">0</span> &nbsp;|&nbsp; HLOUBKA: <span id="depth">0</span>m</div>
+<div id="msg">
+    <h1>◈ JOLANA ◈</h1>
+    <p class="sub">FISHING PRO</p>
+    <p style="color:#444; font-size:13px; letter-spacing:2px; margin-bottom:36px; text-align: center;">POSEKEJ RYBY MAČETOU CESTOU NAHORU</p>
+    <button id="startBtn">&#9654; START</button>
+</div>
+<canvas id="game"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const startBtn = document.getElementById('startBtn');
+const msgEl = document.getElementById('msg');
+const moneyEl = document.getElementById('money');
+const depthEl = document.getElementById('depth');
 
-        /* Styl pro vizuální efekt seknutí mačetou */
-        #machete {
-            position: absolute;
-            background: #fff;
-            box-shadow: 0 0 10px #ff00aa, 0 0 20px #ff00aa, 0 0 30px #ff00aa;
-            border-radius: 4px;
-            pointer-events: none;
-            opacity: 0;
-            z-index: 200; /* Vždy nad vším */
-            transform-origin: top left;
+let width, height, money = 0, gameState = 'START';
+let hook = { x: 0, y: 50, speed: 6 };
+let fishes = [], caughtFishes = [], targetX = 0, time = 0;
+let bubbles = [], seaweeds = [], corals = [], flashes = [];
+
+const fishColors = ['#ff00aa', '#00ffcc', '#ffee00', '#ff6600', '#cc00ff', '#00aaff', '#ff3355', '#44ff88'];
+const ROD_TIP_OFFSET_X = 38;
+const ROD_TIP_Y = -118;
+
+function resize() {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+    hook.x = width / 2;
+    targetX = width / 2;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// --- INIT ---
+function spawn() {
+    fishes = []; caughtFishes = []; flashes = [];
+    bubbles = []; seaweeds = []; corals = [];
+    for (let i = 0; i < 50; i++) {
+        fishes.push({
+            x: Math.random() * width,
+            y: 600 + i * 170,
+            color: fishColors[i % fishColors.length],
+            size: 16 + Math.random() * 10,
+            speed: (Math.random() - 0.5) * 7,
+            caught: false
+        });
+    }
+}
+
+// --- DRAW FISH ---
+function drawFish(x, y, size, color, flip) {
+    ctx.save();
+    ctx.translate(x, y);
+    if (flip) ctx.scale(-1, 1);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, size, size * 0.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.8, 0);
+    ctx.lineTo(-size * 1.4, -size * 0.5);
+    ctx.lineTo(-size * 1.4, size * 0.5);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(size * 0.5, -size * 0.1, size * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawHook(x, y) {
+    ctx.strokeStyle = '#c8dff0';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(x, y - 15);
+    ctx.lineTo(x, y + 5);
+    ctx.arc(x - 5, y + 5, 5, 0, Math.PI);
+    ctx.stroke();
+}
+
+function drawBackground() {
+    const grad = ctx.createLinearGradient(0, 0, 0, height);
+    grad.addColorStop(0, '#002255');
+    grad.addColorStop(1, '#000c1f');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, width, height);
+}
+
+// --- INPUT (ZDE JE TA MAČETA) ---
+function move(e) {
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    targetX = x;
+
+    if (gameState === 'FLY') {
+        caughtFishes.forEach(f => {
+            // "Sekání" - stačí přejet v blízkosti ryby (rádius 60px)
+            if (Math.hypot(x - f.x, y - f.y) < 60) {
+                if (f.y < height + 50) {
+                    f.y = 9999; // Ryba zmizí (posekána)
+                    money += 20;
+                    moneyEl.innerText = money;
+                    flashes.push({ x: x, y: y, color: '#fff', age: 0 });
+                }
+            }
+        });
+    }
+}
+
+window.addEventListener('touchstart', move);
+window.addEventListener('touchmove', move);
+window.addEventListener('mousedown', move);
+window.addEventListener('mousemove', (e) => {
+    // Pro myš: sekání funguje i při držení tlačítka nebo jen pohybu ve FLY fázi
+    move(e);
+});
+
+startBtn.onclick = function () {
+    msgEl.style.display = 'none';
+    money = 0; moneyEl.innerText = '0';
+    hook.y = 50; hook.x = width / 2; targetX = width / 2;
+    spawn();
+    gameState = 'DOWN';
+    requestAnimationFrame(loop);
+};
+
+function loop() {
+    if (gameState === 'START') return;
+    time++;
+    drawBackground();
+
+    if (gameState === 'DOWN' || gameState === 'UP') {
+        hook.x += (targetX - hook.x) * 0.14;
+
+        if (gameState === 'DOWN') {
+            hook.y += 6;
+            depthEl.innerText = Math.floor(hook.y / 10);
+            fishes.forEach(f => {
+                if (Math.hypot(hook.x - f.x, hook.y - f.y) < 30) gameState = 'UP';
+            });
+            if (hook.y > 8000) gameState = 'UP';
+        } else {
+            hook.y -= 7;
+            fishes.forEach(f => {
+                if (!f.caught && Math.hypot(hook.x - f.x, hook.y - f.y) < 40) {
+                    f.caught = true;
+                    caughtFishes.push(f);
+                    money += 5;
+                    moneyEl.innerText = money;
+                }
+            });
+            if (hook.y < 50) {
+                gameState = 'FLY';
+                caughtFishes.forEach(f => {
+                    f.x = width / 2; f.y = height - 50;
+                    f.vx = (Math.random() - 0.5) * 8;
+                    f.vy = -Math.random() * 10 - 5;
+                });
+            }
+        }
+
+        ctx.save();
+        ctx.translate(0, -hook.y + height / 2);
+        fishes.forEach(f => {
+            if (!f.caught) {
+                f.x += f.speed;
+                if (f.x > width + 50) f.x = -50;
+                if (f.x < -50) f.x = width + 50;
+                drawFish(f.x, f.y, f.size, f.color, f.speed < 0);
+            }
+        });
+        drawHook(hook.x, hook.y);
+        ctx.restore();
+    }
+
+    if (gameState === 'FLY') {
+        let active = 0;
+        caughtFishes.forEach(f => {
+            f.x += f.vx; f.y += f.vy; f.vy += 0.15;
+            if (f.y < height + 100) {
+                drawFish(f.x, f.y, f.size, f.color, f.vx < 0);
+                active++;
+            }
+        });
+        
+        flashes = flashes.filter(f => f.age < 15);
+        flashes.forEach(f => {
+            ctx.strokeStyle = f.color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(f.x, f.y, f.age * 3, 0, Math.PI * 2);
+            ctx.stroke();
+            f.age++;
+        });
+
+        if (active === 0) {
+            gameState = 'START';
+            msgEl.style.display = 'flex';
+            msgEl.innerHTML = `
+                <div style="text-align:center">
+                    <h1>GRATULUJI JOLANO</h1>
+                    <p class="sub">Jsi výborná rybářka!</p>
+                    <p style="font-size:40px;color:#ffee00;margin:20px 0;">SKÓRE: ${money}</p>
+                    <p style="margin-bottom:30px">Přejeme hodně štěstí u vody :-)</p>
+                    <button onclick="location.reload()">HRAT ZNOVU</button>
+                </div>
+            `;
+        }
+    }
+    requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
