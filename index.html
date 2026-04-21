@@ -5,100 +5,88 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Jolana Fishing Pro</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000b1a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: white; touch-action: none; }
-        canvas { display: block; width: 100vw; height: 100vh; }
-        #ui { 
-            position: absolute; top: 20px; width: 100%; text-align: center; 
-            pointer-events: none; font-size: 24px; font-weight: 900; 
-            text-shadow: 0 2px 10px rgba(0,0,0,0.5); letter-spacing: 1px;
-        }
-        #money { color: #2ecc71; }
-        #depth { color: #3498db; }
-        #msg { 
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            text-align: center; background: rgba(0, 11, 26, 0.9); padding: 40px; 
-            border-radius: 20px; width: 70%; border: 3px solid #3498db;
-            box-shadow: 0 0 30px rgba(52, 152, 219, 0.4);
-            backdrop-filter: blur(5px);
-        }
-        h1 { margin: 0; font-size: 32px; color: #3498db; text-transform: uppercase; letter-spacing: 3px; }
-        button { 
-            padding: 18px 45px; font-size: 22px; background: #2ecc71; 
-            color: white; border: none; border-radius: 50px; font-weight: bold; 
-            margin-top: 25px; cursor: pointer; transition: 0.2s;
-            box-shadow: 0 5px 15px rgba(46, 204, 113, 0.4);
-        }
-        button:active { transform: scale(0.95); }
-    </small> { color: #bdc3c7; font-size: 16px; display: block; margin-top: 10px; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000b1a; touch-action: none; font-family: sans-serif; }
+        canvas { display: block; width: 100vw; height: 100vh; background: #0044cc; }
+        #ui { position: absolute; top: 15px; width: 100%; text-align: center; color: white; font-size: 22px; font-weight: bold; z-index: 50; pointer-events: none; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        #msg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #000b1a; color: white; z-index: 100; }
+        h1 { color: #3498db; margin-bottom: 10px; }
+        button { padding: 20px 50px; font-size: 24px; background: #2ecc71; color: white; border: 3px solid white; border-radius: 50px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
 
-<div id="ui">SCORE: $<span id="money">0</span> | <span id="depth">0</span>m</div>
+<div id="ui">SKÓRE: <span id="money">0</span> | HLOUBKA: <span id="depth">0</span>m</div>
+
 <div id="msg">
     <h1>RYBÁŘKA JOLANA</h1>
-    <small>Při ponoru se vyhýbej rybám, cestou nahoru je chytej!</small>
-    <button id="startBtn">VYPLOUT NA MOŘE</button>
+    <p style="margin-bottom: 30px;">Chytej ryby cestou nahoru!</p>
+    <button id="startBtn">START</button>
 </div>
+
 <canvas id="game"></canvas>
 
 <script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+const startBtn = document.getElementById('startBtn');
+const msgEl = document.getElementById('msg');
 const moneyEl = document.getElementById('money');
 const depthEl = document.getElementById('depth');
-const msgEl = document.getElementById('msg');
-const startBtn = document.getElementById('startBtn');
 
 let width, height, money = 0, gameState = 'START';
-let hook = { x: 0, y: 50, speed: 5, radius: 12 };
-let fishes = [], caughtFishes = [], targetX = 0, bubbles = [];
+let hook = { x: 0, y: 50, speed: 4, radius: 12 };
+let fishes = [], caughtFishes = [], targetX = 0;
 const colors = ['#FF5E5E', '#FFD95E', '#5EFF8B', '#5EADFF', '#FFFFFF'];
 
-function init() {
+function resize() {
     width = canvas.width = window.innerWidth;
     height = canvas.height = window.innerHeight;
     hook.x = width / 2;
     targetX = width / 2;
 }
-window.addEventListener('resize', init);
-init();
+window.addEventListener('resize', resize);
+resize();
 
-// Bublinky na pozadí
-for(let i=0; i<20; i++) {
-    bubbles.push({ x: Math.random()*width, y: Math.random()*height, r: Math.random()*5+2, s: Math.random()*1+0.5 });
-}
-
-function spawnFishes() {
+function spawn() {
     fishes = [];
     caughtFishes = [];
     for (let i = 0; i < 50; i++) {
         fishes.push({
             x: Math.random() * width,
-            y: 800 + i * 180,
+            y: 600 + (i * 170),
             color: colors[Math.floor(Math.random() * colors.length)],
-            size: 18 + Math.random() * 10,
+            size: 16,
             speed: (Math.random() - 0.5) * 5,
-            wiggle: 0,
             caught: false
         });
     }
 }
 
+// Funkce pro kreslení ryby s ocáskem
+function drawFish(x, y, size, color, flip) {
+    ctx.fillStyle = color;
+    // Tělo
+    ctx.beginPath();
+    ctx.ellipse(x, y, size, size/1.6, 0, 0, Math.PI*2);
+    ctx.fill();
+    // Ocas
+    ctx.beginPath();
+    let tailX = flip ? size : -size;
+    ctx.moveTo(x + tailX, y);
+    ctx.lineTo(x + tailX * 1.5, y - size/1.5);
+    ctx.lineTo(x + tailX * 1.5, y + size/1.5);
+    ctx.fill();
+}
+
 startBtn.onclick = function() {
-    gameState = 'DOWN';
     msgEl.style.display = 'none';
     money = 0;
     moneyEl.innerText = "0";
     hook.y = 50;
-    spawnFishes();
+    spawn();
+    gameState = 'DOWN';
+    // Spuštění smyčky až po kliknutí
+    requestAnimationFrame(loop);
 };
 
-function handleInput(e) {
-    const x = e.touches ? e.touches[0].clientX : e.clientX;
-    const y = e.touches ? e.touches[0].clientY : e.clientY;
-    targetX = x;
-    if (gameState === 'FLY') {
-        caughtFishes.forEach(f => {
-            if (Math.hypot(x - f.x, y - f.y) < 60) {
-                f.y = 90
+function move(e) {
