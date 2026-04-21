@@ -549,19 +549,41 @@ function loop() {
         ctx.restore();
     }
 
+    if (hook.y < 50) {
+                gameState = 'FLY';
+                caughtFishes.forEach((f, index) => {
+                    f.x = width / 2; 
+                    f.y = height - 100;
+                    // Ryby vyletí víc nahoru (vy -7 až -11) a méně do stran
+                    f.vx = (Math.random() - 0.5) * 4; 
+                    f.vy = -Math.random() * 4 - 7;
+                    // Přidáme malou prodlevu, aby nelétaly všechny v jedné hromadě
+                    f.vy -= (index * 0.5); 
+                });
+            }
+        }
+
+        // ... (zbytek vykreslování v loopu)
+    }
+
     if (gameState === 'FLY') {
         let active = 0;
         caughtFishes.forEach(f => {
-            f.x += f.vx; f.y += f.vy; f.vy += 0.04;
+            // Gravitace je mírnější (0.02 místo 0.04), aby ryby "plachtily"
+            f.x += f.vx; f.y += f.vy; f.vy += 0.08; 
+            
+            // Odraz od stěn, aby neutekly z obrazu
+            if (f.x < 20 || f.x > width - 20) f.vx *= -1;
+
             if (f.y < height + 100) {
                 drawFish(f.x, f.y, f.size, f.color, f.vx < 0);
                 active++;
             }
         });
-  if (active === 0) {
+
+        if (active === 0) {
             gameState = 'START';
             msgEl.style.display = 'flex';
-            // Přidané styly přímo do HTML pro zajištění perfektního centrování na mobilu
             msgEl.innerHTML = `
                 <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 90%; text-align: center;">
                     <h1 style="font-size: 28px; line-height: 1.2; margin-bottom: 5px;">GRATULUJI,<br>JOLANO!</h1>
