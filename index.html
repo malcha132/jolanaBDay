@@ -3,23 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Fisher Jolana</title>
+    <title>Jolana Fishing Pro</title>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; touch-action: none; font-family: sans-serif; }
-        canvas { display: block; width: 100vw; height: 100vh; }
-        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #000; color: white; z-index: 100; }
-        button { padding: 25px 60px; font-size: 30px; background: #00ff00; border: none; border-radius: 10px; color: black; font-weight: bold; cursor: pointer; }
-        #ui { position: absolute; top: 15px; width: 100%; text-align: center; color: #00ffff; font-size: 24px; font-weight: bold; z-index: 50; pointer-events: none; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000b1a; touch-action: none; font-family: sans-serif; }
+        canvas { display: block; width: 100vw; height: 100vh; background: #0044cc; }
+        #ui { position: absolute; top: 15px; width: 100%; text-align: center; color: white; font-size: 22px; font-weight: bold; z-index: 50; pointer-events: none; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        #msg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #000b1a; color: white; z-index: 100; }
+        h1 { color: #3498db; margin-bottom: 10px; }
+        button { padding: 20px 50px; font-size: 24px; background: #2ecc71; color: white; border: 3px solid white; border-radius: 50px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
 
-<div id="ui">SKÓRE: <span id="score">0</span> | ČAS: <span id="time">60</span></div>
+<div id="ui">SKÓRE: <span id="money">0</span> | HLOUBKA: <span id="depth">0</span>m</div>
 
-<div id="overlay">
-    <h1 style="color: #00ffff; margin-bottom: 10px;">Rybičky, rybičky, rybáři jedou!</h1>
-    <p style="color: #00ff00; margin-bottom: 40px;">PRO JOLANU</p>
-    <button id="startBtn">HRÁT</button>
+<div id="msg">
+    <h1>RYBÁŘKA JOLANA</h1>
+    <p style="margin-bottom: 30px;">Chytej ryby cestou nahoru!</p>
+    <button id="startBtn">START</button>
 </div>
 
 <canvas id="game"></canvas>
@@ -28,85 +29,165 @@
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const startBtn = document.getElementById('startBtn');
-const overlay = document.getElementById('overlay');
-const scoreEl = document.getElementById('score');
-const timeEl = document.getElementById('time');
+const msgEl = document.getElementById('msg');
+const moneyEl = document.getElementById('money');
+const depthEl = document.getElementById('depth');
 
-let width, height, score = 0, timeLeft = 60, gameState = 'START';
-let playerX = 0, targetX = 0;
-let fishes = [], obstacles = [];
-let gameRunning = false;
+let width, height, money = 0, gameState = 'START';
+let hook = { x: 0, y: 50, speed: 4, radius: 12 };
+let fishes = [], caughtFishes = [], targetX = 0;
+const colors = ['#FF5E5E', '#FFD95E', '#5EFF8B', '#5EADFF', '#FFFFFF'];
 
-function init() {
+function resize() {
     width = canvas.width = window.innerWidth;
     height = canvas.height = window.innerHeight;
-    playerX = width / 2;
+    hook.x = width / 2;
     targetX = width / 2;
 }
-window.addEventListener('resize', init);
-init();
+window.addEventListener('resize', resize);
+resize();
 
-// START HRY
-startBtn.addEventListener('click', function() {
-    overlay.style.display = 'none';
-    score = 0;
-    timeLeft = 60;
+function spawn() {
     fishes = [];
-    obstacles = [];
-    gameState = 'PLAY';
-    
-    if (!gameRunning) {
-        gameRunning = true;
-        timer();
-        loop(); // Spustíme smyčku až po kliknutí
-    }
-});
-
-function timer() {
-    if (gameState === 'PLAY') {
-        timeLeft--;
-        timeEl.innerText = timeLeft;
-        if (timeLeft <= 0) {
-            gameState = 'END';
-            overlay.style.display = 'flex';
-            document.querySelector('h1').innerText = "KONEC!";
-            document.querySelector('p').innerText = "SKÓRE: " + score;
-            startBtn.innerText = "ZNOVU";
-        } else {
-            setTimeout(timer, 1000);
-        }
+    caughtFishes = [];
+    for (let i = 0; i < 50; i++) {
+        fishes.push({
+            x: Math.random() * width,
+            y: 600 + (i * 170),
+            color: colors[Math.floor(Math.random() * colors.length)],
+            size: 16,
+            speed: (Math.random() - 0.5) * 5,
+            caught: false
+        });
     }
 }
 
-// Ovládání
+function drawFish(x, y, size, color, flip) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.ellipse(x, y, size, size/1.6, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    let tailX = flip ? size : -size;
+    ctx.moveTo(x + tailX, y);
+    ctx.lineTo(x + tailX * 1.5, y - size/1.5);
+    ctx.lineTo(x + tailX * 1.5, y + size/1.5);
+    ctx.fill();
+}
+
+startBtn.onclick = function() {
+    msgEl.style.display = 'none';
+    money = 0;
+    moneyEl.innerText = "0";
+    hook.y = 50;
+    spawn();
+    gameState = 'DOWN';
+    requestAnimationFrame(loop);
+};
+
 function move(e) {
     let x = e.touches ? e.touches[0].clientX : e.clientX;
+    let y = e.touches ? e.touches[0].clientY : e.clientY;
     targetX = x;
+    if (gameState === 'FLY') {
+        caughtFishes.forEach(f => {
+            if (Math.hypot(x - f.x, y - f.y) < 60) {
+                f.y = 9000;
+                money += 10;
+                moneyEl.innerText = money;
+            }
+        });
+    }
 }
-window.addEventListener('touchmove', move);
-window.addEventListener('mousemove', move);
+
 window.addEventListener('touchstart', move);
+window.addEventListener('touchmove', move);
+window.addEventListener('mousedown', move);
+window.addEventListener('mousemove', move);
 
 function loop() {
-    if (gameState === 'PLAY') {
-        // Pozadí
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, width, height);
+    if (gameState === 'START') return;
 
-        // Pohyb hráče
-        playerX += (targetX - playerX) * 0.2;
+    ctx.fillStyle = '#0044cc';
+    ctx.fillRect(0, 0, width, height);
 
-        // Paprsek
-        ctx.fillStyle = 'rgba(0, 255, 255, 0.2)';
-        ctx.fillRect(playerX - 30, 100, 60, height);
-        ctx.strokeStyle = '#00ffff';
+    if (gameState === 'DOWN' || gameState === 'UP') {
+        hook.x += (targetX - hook.x) * 0.12;
+
+        if (gameState === 'DOWN') {
+            hook.y += hook.speed;
+            depthEl.innerText = Math.floor(hook.y / 10);
+            fishes.forEach(f => {
+                if (Math.hypot(hook.x - f.x, hook.y - f.y) < f.size) gameState = 'UP';
+            });
+            if (hook.y > 8500) gameState = 'UP';
+        } else {
+            hook.y -= hook.speed * 2.5;
+            fishes.forEach(f => {
+                if (!f.caught && Math.hypot(hook.x - f.x, hook.y - f.y) < 35) {
+                    f.caught = true;
+                    caughtFishes.push(f);
+                }
+            });
+            if (hook.y < 50) {
+                gameState = 'FLY';
+                caughtFishes.forEach(f => {
+                    f.x = width / 2; f.y = height - 50;
+                    f.vx = (Math.random() - 0.5) * 12;
+                    f.vy = -Math.random() * 10 - 6;
+                });
+            }
+        }
+
+        ctx.save();
+        ctx.translate(0, -hook.y + height / 2);
+
+        ctx.strokeStyle = "white";
         ctx.lineWidth = 2;
-        ctx.strokeRect(playerX - 30, 100, 60, height);
+        ctx.beginPath();
+        ctx.moveTo(width / 2, 0);
+        ctx.lineTo(hook.x, hook.y);
+        ctx.stroke();
 
-        // Loďka
-        ctx.fillStyle = '#00ff00';
-        ctx.fillRect(playerX - 40, 70, 80, 30);
+        // OPRAVA: "#silver" je neplatná barva, musí být bez #
+        ctx.strokeStyle = "silver";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(hook.x - 8, hook.y, 8, 0, Math.PI);
+        ctx.stroke();
 
-        // Spawnování
-        if (Math.random() < 0.05) {
-            fishes.push({ x: Math.random() * width, y: height + 20, speed: Math.random() * 3 + 2, color: '#
+        fishes.forEach(f => {
+            if (!f.caught) {
+                f.x += f.speed;
+                if (f.x > width + 100) f.x = -100;
+                if (f.x < -100) f.x = width + 100;
+                drawFish(f.x, f.y, f.size, f.color, f.speed < 0);
+            }
+        });
+        ctx.restore();
+    }
+
+    if (gameState === 'FLY') {
+        let active = 0;
+        caughtFishes.forEach(f => {
+            f.x += f.vx; f.y += f.vy;
+            f.vy += 0.05;
+            if (f.y < height + 100) {
+                drawFish(f.x, f.y, f.size, f.color, f.vx < 0);
+                active++;
+            }
+        });
+        // OPRAVA: původní podmínka `&& caughtFishes.length > 0` způsobovala,
+        // že hra uvízla navždy, když žádná ryba nebyla chycena (active===0, length===0 → nikdy true)
+        if (active === 0) {
+            gameState = 'START';
+            msgEl.style.display = 'flex';
+            msgEl.innerHTML = "<h1>KONEC LOVU</h1>SKÓRE: " + money + "<br><br><button onclick='location.reload()'>ZNOVU</button>";
+        }
+    }
+
+    requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
