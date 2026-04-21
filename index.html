@@ -63,7 +63,7 @@ const moneyEl = document.getElementById('money');
 const depthEl = document.getElementById('depth');
 
 let width, height, money = 0, gameState = 'START';
-let hook = { x: 0, y: 50, speed: 9, radius: 12 };
+let hook = { x: 0, y: 50, speed: 6, radius: 12 };
 let fishes = [], caughtFishes = [], targetX = 0;
 let time = 0;
 
@@ -194,7 +194,7 @@ function loop() {
             });
             if (hook.y > 8500) gameState = 'UP';
         } else {
-            hook.y -= hook.speed * 2.8;
+            hook.y -= hook.speed * 1.6;
             fishes.forEach(f => {
                 if (!f.caught && Math.hypot(hook.x - f.x, hook.y - f.y) < 40) {
                     f.caught = true;
