@@ -3,45 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Jolana Fishing Pro - Deluxe</title>
+    <title>Jolana Fishing Pro</title>
     <style>
-        * { box-sizing: border-box; }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000816; touch-action: none; font-family: 'Segoe UI', Arial, sans-serif; }
-        canvas { display: block; filter: contrast(110%) brightness(110%); }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #000816; overflow: hidden; font-family: 'Segoe UI', sans-serif; touch-action: none; }
+        canvas { display: block; }
         
         #ui {
             position: absolute; top: 20px; width: 100%; text-align: center;
-            color: #00ffcc; font-size: 24px; font-weight: bold; z-index: 50;
-            pointer-events: none; letter-spacing: 2px;
-            text-shadow: 0 0 10px #00ffcc, 0 0 20px rgba(0, 255, 204, 0.5);
+            color: #00ffcc; font-size: 24px; font-weight: bold; pointer-events: none;
+            text-shadow: 0 0 10px #00ffcc; z-index: 10;
         }
 
         #msg {
             position: absolute; inset: 0; display: flex; flex-direction: column; 
             justify-content: center; align-items: center; 
-            background: rgba(0, 8, 22, 0.85); color: white; z-index: 100;
-            backdrop-filter: blur(10px); text-align: center; padding: 20px;
+            background: rgba(0, 10, 30, 0.95); color: white; z-index: 100;
+            text-align: center; padding: 20px;
         }
 
-        h1 { font-size: 48px; color: #ff00aa; margin: 0; text-shadow: 0 0 20px #ff00aa; letter-spacing: 2px; line-height: 1.2; }
-        .sub { color: #00ffcc; letter-spacing: 4px; margin-top: 10px; font-size: 18px; text-transform: uppercase; }
+        h1 { font-size: 45px; color: #ff00aa; text-shadow: 0 0 20px #ff00aa; margin-bottom: 10px; }
+        .sub { color: #00ffcc; letter-spacing: 3px; font-size: 18px; margin-bottom: 30px; }
         
         button { 
-            margin-top: 30px; padding: 18px 50px; font-size: 22px; background: transparent; 
+            padding: 20px 60px; font-size: 22px; background: transparent; 
             color: #ff00aa; border: 3px solid #ff00aa; cursor: pointer; 
-            font-weight: bold; transition: 0.3s; box-shadow: 0 0 15px rgba(255, 0, 170, 0.3);
+            font-weight: bold; box-shadow: 0 0 15px #ff00aa44; transition: 0.2s;
         }
-        button:hover { background: #ff00aa; color: white; box-shadow: 0 0 30px #ff00aa; }
+        button:hover { background: #ff00aa; color: white; }
     </style>
 </head>
 <body>
 
-<div id="ui">SKÓRE: <span id="money">0</span> &nbsp;|&nbsp; <span id="depth">0</span>m</div>
+<div id="ui">SKÓRE: <span id="money">0</span> | <span id="depth">0</span>m</div>
 
 <div id="msg">
     <h1>◈ JOLANA ◈</h1>
-    <p class="sub">Fishing Pro Deluxe</p>
-    <button id="startBtn">SPOUSTIT LOV</button>
+    <p class="sub">NEON FISHING PRO</p>
+    <button id="startBtn">START</button>
 </div>
 
 <canvas id="game"></canvas>
@@ -51,11 +50,9 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const startBtn = document.getElementById('startBtn');
 const msgEl = document.getElementById('msg');
-const moneyEl = document.getElementById('money');
-const depthEl = document.getElementById('depth');
 
 let width, height, money = 0, gameState = 'START';
-let hook = { x: 0, y: 50, speed: 9 };
+let hook = { x: 0, y: 50 };
 let fishes = [], caughtFishes = [], trail = [];
 let targetX = 0;
 
@@ -63,24 +60,24 @@ function resize() {
     width = canvas.width = window.innerWidth;
     height = canvas.height = window.innerHeight;
     hook.x = width / 2;
+    targetX = width / 2;
 }
 window.addEventListener('resize', resize);
 resize();
 
-function spawn() {
+function spawnFishes() {
     fishes = []; caughtFishes = []; trail = [];
-    for (let i = 0; i < 45; i++) {
+    for (let i = 0; i < 40; i++) {
         fishes.push({
             x: Math.random() * width,
-            y: 700 + i * 190,
+            y: 600 + i * 200,
             hue: Math.random() * 360,
-            size: 22 + Math.random() * 12,
-            speed: (Math.random() - 0.5) * 8,
+            size: 20 + Math.random() * 10,
+            speed: (Math.random() - 0.5) * 6,
             vx: 0, vy: 0,
             caught: false,
             sliced: false,
-            sliceGap: 0,
-            rot: 0
+            sliceGap: 0
         });
     }
 }
@@ -88,48 +85,33 @@ function spawn() {
 function drawFish(f) {
     ctx.save();
     ctx.translate(f.x, f.y);
-    ctx.rotate(f.rot);
     
+    // Směr ryby
     let dir = (gameState === 'FLY') ? f.vx : f.speed;
     if (dir < 0) ctx.scale(-1, 1);
     
-    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, f.size);
-    grad.addColorStop(0, `hsl(${f.hue}, 90%, 70%)`);
-    grad.addColorStop(1, `hsl(${f.hue}, 90%, 40%)`);
-    
-    ctx.fillStyle = grad;
+    ctx.fillStyle = `hsl(${f.hue}, 100%, 60%)`;
     ctx.shadowBlur = f.sliced ? 0 : 20;
-    ctx.shadowColor = `hsl(${f.hue}, 90%, 50%)`;
+    ctx.shadowColor = `hsl(${f.hue}, 100%, 50%)`;
 
     if (f.sliced) {
-        // Efektní rozseknutí
-        ctx.fillRect(-f.size, -f.sliceGap - 4, f.size * 1.6, f.size * 0.4);
-        ctx.fillRect(-f.size, f.sliceGap + 4, f.size * 1.6, f.size * 0.4);
+        // Rozseknutá ryba
+        ctx.fillRect(-f.size, -f.sliceGap - 2, f.size * 1.5, f.size * 0.4);
+        ctx.fillRect(-f.size, f.sliceGap + 2, f.size * 1.5, f.size * 0.4);
     } else {
-        // Tělo ryby
+        // Celá ryba
         ctx.beginPath();
-        ctx.ellipse(0, 0, f.size, f.size * 0.65, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, f.size, f.size * 0.6, 0, 0, Math.PI * 2);
         ctx.fill();
-        // Ocas
         ctx.beginPath();
         ctx.moveTo(-f.size * 0.8, 0);
-        ctx.lineTo(-f.size * 1.5, -f.size * 0.6);
-        ctx.lineTo(-f.size * 1.5, f.size * 0.6);
-        ctx.closePath();
+        ctx.lineTo(-f.size * 1.4, -f.size * 0.5);
+        ctx.lineTo(-f.size * 1.4, f.size * 0.5);
         ctx.fill();
-        // Oko
-        ctx.fillStyle = "white";
-        ctx.beginPath(); ctx.arc(f.size * 0.5, -f.size * 0.15, f.size * 0.15, 0, Math.PI*2); ctx.fill();
     }
     ctx.restore();
 }
 
-function move(e) {
-    const x = e.touches ? e.touches[0].clientX : e.clientX;
-    const y = e.touches ? e.touches[0].clientY : e.clientY;
-    targetX = x;
-
-    if (gameState === 'FLY') {
-        trail.push({ x, y, age: 0 });
-        caughtFishes.forEach(f => {
-            if (!f.sliced && Math.hypot(x - f.x, y - f.y
+function input(e) {
+    const x = (e.touches ? e.touches[0].clientX : e.clientX);
+    const y = (e.touches ? e.touches[0].clientY : e.clientY);
