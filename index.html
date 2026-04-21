@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fishing Game for Jolana</title>
+    <title>Fishing Game for Jolana (Slow Edition)</title>
     <style>
         body, html { 
             margin: 0; padding: 0; width: 100%; height: 100%; 
@@ -11,27 +11,18 @@
             touch-action: none; user-select: none; -webkit-user-select: none;
         }
         canvas { display: block; width: 100vw; height: 100vh; background: linear-gradient(#4da6ff, #001a33); }
-        
         #overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center;
             align-items: center; background: rgba(0, 26, 51, 0.9);
             color: white; font-family: sans-serif; z-index: 100;
         }
-        
         button {
             padding: 25px 50px; font-size: 28px; font-weight: bold;
             background: #2ecc71; border: none; border-radius: 50px;
             color: white; box-shadow: 0 8px 20px rgba(0,0,0,0.5);
-            cursor: pointer; animation: pulse 1.5s infinite;
+            cursor: pointer;
         }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
-
         #ui {
             position: absolute; top: 15px; width: 100%;
             text-align: center; color: white; font-family: sans-serif;
@@ -44,7 +35,7 @@
 <div id="ui">$ <span id="money">0</span> | <span id="depth">0</span> m</div>
 
 <div id="overlay">
-    <h1 style="margin-bottom: 5px; letter-spacing: 2px;">FISHING GAME</h1>
+    <h1 style="margin-bottom: 5px;">POHODOVÉ RYBÁŘENÍ</h1>
     <h2 style="margin-bottom: 30px; color: #4da6ff;">PRO JOLANU</h2>
     <button id="startBtn">START</button>
 </div>
@@ -60,7 +51,9 @@ const moneyEl = document.getElementById('money');
 const depthEl = document.getElementById('depth');
 
 let width, height, money = 0, gameState = 'START';
-let hook = { x: 0, y: 50, speed: 7, radius: 15 };
+// --- ZPOMALENÍ --- 
+// speed: 3 (původně 7) - pomalejší klesání
+let hook = { x: 0, y: 50, speed: 3.5, radius: 15 }; 
 let fishes = [], caughtFishes = [], targetX = 0;
 let animationStarted = false;
 
@@ -74,34 +67,27 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// Spuštění hry po kliknutí
 startBtn.addEventListener('click', (e) => {
     e.preventDefault();
-    e.stopPropagation();
-    
     overlay.style.display = 'none';
     gameState = 'DOWN';
     money = 0;
     moneyEl.innerText = money;
     hook.y = 50;
     spawnFishes();
-
-    if (!animationStarted) {
-        animationStarted = true;
-        draw(); // Spustíme smyčku až teď
-    }
+    if (!animationStarted) { animationStarted = true; draw(); }
 });
 
 function spawnFishes() {
     fishes = [];
     caughtFishes = [];
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 50; i++) {
         fishes.push({
             x: Math.random() * width,
-            y: 600 + i * 180,
+            y: 600 + i * 200, // Větší mezery mezi rybami
             color: `hsl(${Math.random() * 360}, 80%, 60%)`,
             size: 25 + Math.random() * 15,
-            speed: (Math.random() - 0.5) * 5,
+            speed: (Math.random() - 0.5) * 2, // Ryby plavou pomaleji
             caught: false
         });
     }
@@ -111,7 +97,6 @@ function move(e) {
     let clientX = e.touches ? e.touches[0].clientX : e.clientX;
     let clientY = e.touches ? e.touches[0].clientY : e.clientY;
     targetX = clientX;
-    
     if (gameState === 'FLY' && (e.type === 'touchstart' || e.type === 'mousedown')) {
         checkHit(clientX, clientY);
     }
@@ -125,7 +110,7 @@ window.addEventListener('touchmove', move, {passive: false});
 function checkHit(tx, ty) {
     caughtFishes.forEach(f => {
         let dist = Math.hypot(tx - f.x, ty - f.y);
-        if (dist < 60 && f.y < height) {
+        if (dist < 70 && f.y < height) { // Větší zóna dotyku (jednodušší)
             f.y = height + 2000;
             money += 10;
             moneyEl.innerText = money;
@@ -135,7 +120,7 @@ function checkHit(tx, ty) {
 
 function update() {
     if (gameState === 'DOWN' || gameState === 'UP') {
-        hook.x += (targetX - hook.x) * 0.15;
+        hook.x += (targetX - hook.x) * 0.08; // Plynulejší, pomalejší pohyb do stran
 
         if (gameState === 'DOWN') {
             hook.y += hook.speed;
@@ -143,9 +128,9 @@ function update() {
             fishes.forEach(f => {
                 if (Math.hypot(hook.x - f.x, hook.y - f.y) < f.size) gameState = 'UP';
             });
-            if (hook.y > 10000) gameState = 'UP';
+            if (hook.y > 8000) gameState = 'UP';
         } else {
-            hook.y -= hook.speed * 2.5;
+            hook.y -= hook.speed * 1.5; // Pomalejší vytahování (původně 2.5x)
             fishes.forEach(f => {
                 if (!f.caught && Math.hypot(hook.x - f.x, hook.y - f.y) < f.size + 15) {
                     f.caught = true;
@@ -162,7 +147,8 @@ function update() {
     if (gameState === 'FLY') {
         let active = 0;
         caughtFishes.forEach(f => {
-            f.x += f.vx; f.y += f.vy; f.vy += 0.25;
+            f.x += f.vx; f.y += f.vy; 
+            f.vy += 0.1; // Menší gravitace = ryby déle plachtí (původně 0.25)
             if (f.y < height + 100) active++;
         });
         if (active === 0) {
@@ -184,30 +170,26 @@ function update() {
 function launchFishes() {
     caughtFishes.forEach(f => {
         f.x = width / 2; f.y = height - 50;
-        f.vx = (Math.random() - 0.5) * 20;
-        f.vy = -Math.random() * 25 - 10;
+        f.vx = (Math.random() - 0.5) * 10; // Menší rozptyl do stran
+        f.vy = -Math.random() * 12 - 5;    // Menší síla výstřelu
     });
 }
 
 function draw() {
     ctx.clearRect(0, 0, width, height);
-
     if (gameState === 'DOWN' || gameState === 'UP') {
         ctx.save();
         ctx.translate(0, -hook.y + height / 2);
-        
         ctx.strokeStyle = "rgba(255,255,255,0.7)";
         ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.moveTo(width / 2, -500);
         ctx.lineTo(hook.x, hook.y);
         ctx.stroke();
-
-        ctx.fillStyle = "#ff0000"; // Červený háček pro viditelnost
+        ctx.fillStyle = "#ff4444"; 
         ctx.beginPath();
         ctx.arc(hook.x, hook.y, hook.radius, 0, Math.PI * 2);
         ctx.fill();
-
         fishes.forEach(f => {
             if (!f.caught) {
                 ctx.fillStyle = f.color;
@@ -218,7 +200,6 @@ function draw() {
         });
         ctx.restore();
     }
-
     if (gameState === 'FLY') {
         caughtFishes.forEach(f => {
             ctx.fillStyle = f.color;
@@ -227,7 +208,6 @@ function draw() {
             ctx.fill();
         });
     }
-
     update();
     requestAnimationFrame(draw);
 }
