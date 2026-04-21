@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Jolana Fishing Pro</title>
+    <title>Jolana Fishing Pro - Machete Cut</title>
     <style>
         * { box-sizing: border-box; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000c1f; touch-action: none; font-family: 'Courier New', monospace; }
-        canvas { display: block; width: 100vw; height: 100vh; }
+        canvas { display: block; width: 100vw; height: 100vh; z-index: 10; }
+        
+        /* Styl pro UI prvků */
         #ui {
             position: absolute; top: 18px; width: 100%; text-align: center;
             color: #00ffcc; font-size: 20px; font-weight: bold; z-index: 50;
@@ -21,14 +23,16 @@
         }
         h1 { font-family: 'Courier New', monospace; font-size: 42px; letter-spacing: 6px; color: #ff00aa; margin-bottom: 8px; text-shadow: 0 0 10px #ff00aa, 0 0 30px #ff00aa88; text-align: center; }
         .sub { color: #00ffcc; letter-spacing: 4px; font-size: 14px; margin-bottom: 40px; text-shadow: 0 0 8px #00ffcc; text-align: center; }
-        button { padding: 18px 55px; font-size: 22px; font-family: 'Courier New', monospace; background: transparent; color: #ff00aa; letter-spacing: 4px; border: 2px solid #ff00aa; border-radius: 4px; font-weight: bold; cursor: pointer; text-shadow: 0 0 8px #ff00aa; box-shadow: 0 0 12px #ff00aa88, inset 0 0 12px #ff00aa22; transition: all 0.15s; }
+        button { padding: 18px 55px; font-size: 22px; font-family: 'Courier New', monospace; background: transparent; color: #ff00aa; letter-spacing: 4px; border: 2px solid #ff00aa; border-radius: 4px; font-weight: bold; cursor: pointer; text-shadow: 0 0 8px #ff00aa; box-shadow: 0 0 12px #ff00aa88, inset 0 0 12px #ff00aa22; transition: all 0.15s; z-index: 110; }
         button:hover { background: #ff00aa22; box-shadow: 0 0 24px #ff00aacc, inset 0 0 20px #ff00aa44; }
-    </style>
-</head>
-<body>
-<div id="ui">SKÓRE: <span id="money">0</span> &nbsp;|&nbsp; HLOUBKA: <span id="depth">0</span>m</div>
-<div id="msg">
-    <h1>◈ JOLANA ◈</h1>
-    <p class="sub">FISHING PRO</p>
-    <p style="color:#444; font-size:13px; letter-spacing:2px; margin-bottom:36px; text-align: center;">CHYTEJ RYBY CESTOU NAHORU</p>
-    <button id="startBtn">&#
+
+        /* Styl pro vizuální efekt seknutí mačetou */
+        #machete {
+            position: absolute;
+            background: #fff;
+            box-shadow: 0 0 10px #ff00aa, 0 0 20px #ff00aa, 0 0 30px #ff00aa;
+            border-radius: 4px;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 200; /* Vždy nad vším */
+            transform-origin: top left;
