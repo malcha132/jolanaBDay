@@ -23,10 +23,17 @@
         .sub { color: #00ffcc; letter-spacing: 4px; font-size: 14px; margin-bottom: 40px; text-shadow: 0 0 8px #00ffcc; }
         button { padding: 18px 55px; font-size: 22px; font-family: 'Courier New', monospace; background: transparent; color: #ff00aa; letter-spacing: 4px; border: 2px solid #ff00aa; border-radius: 4px; font-weight: bold; cursor: pointer; text-shadow: 0 0 8px #ff00aa; box-shadow: 0 0 12px #ff00aa88, inset 0 0 12px #ff00aa22; transition: all 0.15s; }
         button:hover { background: #ff00aa22; box-shadow: 0 0 24px #ff00aacc, inset 0 0 20px #ff00aa44; }
+        #slashHint {
+            position: absolute; bottom: 28px; width: 100%; text-align: center;
+            color: #ff00aa88; font-size: 13px; letter-spacing: 3px;
+            pointer-events: none; z-index: 50;
+            text-shadow: 0 0 6px #ff00aa44;
+        }
     </style>
 </head>
 <body>
 <div id="ui">SKÓRE: <span id="money">0</span> &nbsp;|&nbsp; HLOUBKA: <span id="depth">0</span>m</div>
+<div id="slashHint" style="display:none">⚔ SEKEJ MACHETOU</div>
 <div id="msg">
     <h1>◈ JOLANA ◈</h1>
     <p class="sub">FISHING PRO</p>
@@ -41,15 +48,19 @@ const startBtn = document.getElementById('startBtn');
 const msgEl = document.getElementById('msg');
 const moneyEl = document.getElementById('money');
 const depthEl = document.getElementById('depth');
+const slashHint = document.getElementById('slashHint');
 
 let width, height, money = 0, gameState = 'START';
 let hook = { x: 0, y: 50, speed: 6 };
 let fishes = [], caughtFishes = [], targetX = 0, time = 0;
 let bubbles = [], seaweeds = [], corals = [], flashes = [];
+let slashes = [];       // visual slash trails
+let slashPieces = [];   // split fish halves
+let prevPointer = null;
 
 const fishColors = ['#ff00aa', '#00ffcc', '#ffee00', '#ff6600', '#cc00ff', '#00aaff', '#ff3355', '#44ff88'];
-const ROD_TIP_OFFSET_X = 38; // relative to width/2
-const ROD_TIP_Y = -118;      // world y
+const ROD_TIP_OFFSET_X = 38;
+const ROD_TIP_Y = -118;
 
 function resize() {
     width = canvas.width = window.innerWidth;
@@ -104,6 +115,7 @@ function initCorals() {
 
 function spawn() {
     fishes = []; caughtFishes = []; flashes = [];
+    slashes = []; slashPieces = [];
     initBubbles(); initSeaweeds(); initCorals();
     for (let i = 0; i < 50; i++) {
         fishes.push({
@@ -118,6 +130,24 @@ function spawn() {
     }
 }
 
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+// Returns true if line segment (x1,y1)→(x2,y2) intersects circle (cx,cy,r)
+function lineCircleIntersect(x1, y1, x2, y2, cx, cy, r) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const fx = x1 - cx, fy = y1 - cy;
+    const a = dx*dx + dy*dy;
+    if (a === 0) return Math.hypot(fx, fy) <= r;
+    const b = 2*(fx*dx + fy*dy);
+    const c = fx*fx + fy*fy - r*r;
+    let disc = b*b - 4*a*c;
+    if (disc < 0) return false;
+    disc = Math.sqrt(disc);
+    const t1 = (-b - disc) / (2*a);
+    const t2 = (-b + disc) / (2*a);
+    return (t1 >= 0 && t1 <= 1) || (t2 >= 0 && t2 <= 1);
+}
+
 // ─── DRAW FISH ────────────────────────────────────────────────────────────────
 
 function drawFish(x, y, size, color, flip) {
@@ -128,7 +158,6 @@ function drawFish(x, y, size, color, flip) {
     ctx.shadowBlur = 18;
     ctx.shadowColor = color;
 
-    // Body
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.moveTo(size * 0.82, 0);
@@ -136,7 +165,6 @@ function drawFish(x, y, size, color, flip) {
     ctx.bezierCurveTo(-size * 0.45, size * 0.42, size * 0.6, size * 0.42, size * 0.82, 0);
     ctx.fill();
 
-    // Belly highlight
     ctx.shadowBlur = 0;
     ctx.fillStyle = 'rgba(255,255,255,0.18)';
     ctx.beginPath();
@@ -145,7 +173,6 @@ function drawFish(x, y, size, color, flip) {
     ctx.bezierCurveTo(-size * 0.3, size * 0.42, size * 0.15, size * 0.4, size * 0.45, size * 0.08);
     ctx.fill();
 
-    // Tail top lobe
     ctx.shadowBlur = 10;
     ctx.shadowColor = color;
     ctx.fillStyle = color;
@@ -154,21 +181,18 @@ function drawFish(x, y, size, color, flip) {
     ctx.bezierCurveTo(-size * 1.0, -size * 0.12, -size * 1.45, -size * 0.58, -size * 1.35, -size * 0.68);
     ctx.bezierCurveTo(-size * 1.15, -size * 0.46, -size * 0.92, -size * 0.22, -size * 0.72, 0);
     ctx.fill();
-    // Tail bottom lobe
     ctx.beginPath();
     ctx.moveTo(-size * 0.72, 0);
     ctx.bezierCurveTo(-size * 1.0, size * 0.12, -size * 1.45, size * 0.58, -size * 1.35, size * 0.68);
     ctx.bezierCurveTo(-size * 1.15, size * 0.46, -size * 0.92, size * 0.22, -size * 0.72, 0);
     ctx.fill();
 
-    // Dorsal fin
     ctx.beginPath();
     ctx.moveTo(-size * 0.05, -size * 0.46);
     ctx.bezierCurveTo(size * 0.15, -size * 0.9, size * 0.5, -size * 0.82, size * 0.52, -size * 0.46);
     ctx.closePath();
     ctx.fill();
 
-    // Pectoral fin (semi-transparent)
     ctx.fillStyle = color + '77';
     ctx.beginPath();
     ctx.moveTo(size * 0.15, size * 0.12);
@@ -176,18 +200,15 @@ function drawFish(x, y, size, color, flip) {
     ctx.closePath();
     ctx.fill();
 
-    // Eye white
     ctx.shadowBlur = 0;
     ctx.fillStyle = '#fff';
     ctx.beginPath();
     ctx.arc(size * 0.5, -size * 0.08, size * 0.18, 0, Math.PI * 2);
     ctx.fill();
-    // Pupil
     ctx.fillStyle = '#111';
     ctx.beginPath();
     ctx.arc(size * 0.52, -size * 0.08, size * 0.11, 0, Math.PI * 2);
     ctx.fill();
-    // Highlight
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
     ctx.beginPath();
     ctx.arc(size * 0.56, -size * 0.13, size * 0.045, 0, Math.PI * 2);
@@ -198,6 +219,30 @@ function drawFish(x, y, size, color, flip) {
     ctx.shadowColor = 'transparent';
 }
 
+// Draw only top or bottom half of fish using clipping
+function drawFishHalf(piece) {
+    ctx.save();
+    ctx.beginPath();
+    if (piece.isTop) {
+        ctx.rect(piece.x - piece.size * 2.5, piece.y - piece.size * 2.5, piece.size * 5, piece.size * 2.5);
+    } else {
+        ctx.rect(piece.x - piece.size * 2.5, piece.y, piece.size * 5, piece.size * 2.5);
+    }
+    ctx.clip();
+    drawFish(piece.x, piece.y, piece.size, piece.color, piece.flip);
+
+    // Red cut edge
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255, 40, 40, 0.85)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(piece.x - piece.size * 2, piece.y);
+    ctx.lineTo(piece.x + piece.size * 2, piece.y);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
 // ─── DRAW HOOK ────────────────────────────────────────────────────────────────
 
 function drawHook(x, y) {
@@ -206,19 +251,15 @@ function drawHook(x, y) {
     ctx.strokeStyle = '#c8dff0';
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
-    // Shank
     ctx.beginPath();
     ctx.moveTo(x, y - 12);
     ctx.lineTo(x, y + 6);
-    // Bend + point
     ctx.arc(x - 7, y + 6, 7, 0, Math.PI * 0.75);
     ctx.stroke();
-    // Barb
     ctx.beginPath();
     ctx.moveTo(x - 13, y + 8);
     ctx.lineTo(x - 9, y + 2);
     ctx.stroke();
-    // Bait (little worm)
     ctx.shadowColor = '#ff5522';
     ctx.shadowBlur = 8;
     ctx.strokeStyle = '#ff3300';
@@ -236,7 +277,6 @@ function drawBoat() {
     const bx = width / 2;
     const by = -80;
 
-    // Hull shadow
     ctx.fillStyle = '#2a1505';
     ctx.beginPath();
     ctx.moveTo(bx - 52, by + 12);
@@ -246,7 +286,6 @@ function drawBoat() {
     ctx.closePath();
     ctx.fill();
 
-    // Hull
     ctx.fillStyle = '#7B3F10';
     ctx.beginPath();
     ctx.moveTo(bx - 50, by + 10);
@@ -256,7 +295,6 @@ function drawBoat() {
     ctx.closePath();
     ctx.fill();
 
-    // Hull rim
     ctx.strokeStyle = '#A0522D';
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -264,14 +302,12 @@ function drawBoat() {
     ctx.lineTo(bx + 50, by + 10);
     ctx.stroke();
 
-    // Cabin
     ctx.fillStyle = '#9C6B3A';
     ctx.fillRect(bx - 15, by - 12, 32, 24);
     ctx.strokeStyle = '#7B4F25';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(bx - 15, by - 12, 32, 24);
 
-    // Fishing rod
     ctx.shadowBlur = 4;
     ctx.shadowColor = '#553311';
     ctx.strokeStyle = '#6B4226';
@@ -279,7 +315,7 @@ function drawBoat() {
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(bx - 28, by + 8);
-    ctx.lineTo(bx + ROD_TIP_OFFSET_X, ROD_TIP_Y + by + 80); // rod tip
+    ctx.lineTo(bx + ROD_TIP_OFFSET_X, ROD_TIP_Y + by + 80);
     ctx.stroke();
     ctx.shadowBlur = 0;
 }
@@ -317,7 +353,6 @@ function drawSurface() {
         x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.stroke();
-    // Shimmer layer just below
     ctx.shadowBlur = 0;
     ctx.fillStyle = 'rgba(50, 130, 220, 0.12)';
     ctx.fillRect(0, 2, width, 28);
@@ -348,7 +383,6 @@ function updateBubbles() {
         b.y -= b.speed;
         b.x += Math.sin(time * 0.04 + b.phase) * 0.4;
         if (b.y < -40) b.y = 8700;
-        // Only draw if roughly on screen
         const screenY = b.y - hook.y + height / 2;
         if (screenY < -20 || screenY > height + 20) return;
         ctx.strokeStyle = 'rgba(140, 210, 255, 0.38)';
@@ -366,7 +400,7 @@ function updateBubbles() {
 // ─── DRAW SEAWEED ─────────────────────────────────────────────────────────────
 
 function drawSeaweeds() {
-    seaweeds.forEach((sw, i) => {
+    seaweeds.forEach(sw => {
         ctx.strokeStyle = `rgba(20, ${sw.g}, 55, 0.78)`;
         ctx.lineWidth = sw.lw;
         ctx.lineCap = 'round';
@@ -393,7 +427,6 @@ function drawCorals() {
         ctx.beginPath();
         ctx.ellipse(c.x, c.y, c.r, c.r * 0.55, 0, 0, Math.PI * 2);
         ctx.fill();
-        // A couple of bumps on top
         ctx.beginPath();
         ctx.ellipse(c.x - c.r * 0.3, c.y - c.r * 0.3, c.r * 0.4, c.r * 0.35, 0, 0, Math.PI * 2);
         ctx.fill();
@@ -409,7 +442,6 @@ function updateFlashes() {
     flashes = flashes.filter(fl => fl.age < 22);
     flashes.forEach(fl => {
         const r = fl.age * 2.8;
-        const op = (1 - fl.age / 22).toFixed(2);
         ctx.strokeStyle = fl.color + Math.floor((1 - fl.age / 22) * 255).toString(16).padStart(2, '0');
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -419,12 +451,31 @@ function updateFlashes() {
     });
 }
 
+// ─── DRAW SLASH TRAILS ────────────────────────────────────────────────────────
+
+function updateSlashes() {
+    slashes = slashes.filter(sl => sl.age < 14);
+    slashes.forEach(sl => {
+        const op = (1 - sl.age / 14);
+        ctx.save();
+        ctx.strokeStyle = `rgba(255, 240, 80, ${op * 0.95})`;
+        ctx.shadowColor = `rgba(255, 200, 0, ${op})`;
+        ctx.shadowBlur = 12;
+        ctx.lineWidth = 3.5 * op + 1;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(sl.x1, sl.y1);
+        ctx.lineTo(sl.x2, sl.y2);
+        ctx.stroke();
+        ctx.restore();
+        sl.age++;
+    });
+}
+
 // ─── BACKGROUND ───────────────────────────────────────────────────────────────
 
 function drawBackground() {
     const surfaceScreenY = height / 2 - hook.y;
-
-    // Sky (only when near surface)
     if (surfaceScreenY > 0) {
         const skyGrad = ctx.createLinearGradient(0, 0, 0, surfaceScreenY);
         skyGrad.addColorStop(0, '#000810');
@@ -432,8 +483,6 @@ function drawBackground() {
         ctx.fillStyle = skyGrad;
         ctx.fillRect(0, 0, width, surfaceScreenY);
     }
-
-    // Water
     const wTop = Math.max(0, surfaceScreenY);
     const waterGrad = ctx.createLinearGradient(0, wTop, 0, height);
     waterGrad.addColorStop(0,   '#004488');
@@ -455,25 +504,74 @@ startBtn.onclick = function () {
     requestAnimationFrame(loop);
 };
 
-function move(e) {
-    const x = e.touches ? e.touches[0].clientX : e.clientX;
-    const y = e.touches ? e.touches[0].clientY : e.clientY;
-    targetX = x;
-    if (gameState === 'FLY') {
-        caughtFishes.forEach(f => {
-            if (Math.hypot(x - f.x, y - f.y) < 65) {
-                f.y = 9999;
-                money += 10;
-                moneyEl.innerText = money;
-                flashes.push({ x: f.x, y: f.y, color: f.color, age: 0 });
-            }
-        });
-    }
+function getPointer(e) {
+    return {
+        x: e.touches ? e.touches[0].clientX : e.clientX,
+        y: e.touches ? e.touches[0].clientY : e.clientY
+    };
 }
+
+function handleSlash(px, py, cx, cy) {
+    if (gameState !== 'FLY') return;
+    const speed = Math.hypot(cx - px, cy - py);
+    if (speed < 12) return; // too slow to be a slash
+
+    caughtFishes.forEach(f => {
+        if (f.y > height + 200) return; // already gone
+        if (!lineCircleIntersect(px, py, cx, cy, f.x, f.y, f.size * 1.8)) return;
+
+        // Split the fish!
+        const spread = 2.5 + Math.random() * 2;
+        slashPieces.push({
+            x: f.x, y: f.y,
+            vx: f.vx - spread * 0.3,
+            vy: f.vy - 1.2,
+            size: f.size, color: f.color, flip: f.flip,
+            isTop: true,
+            rot: 0, rotSpeed: -(0.04 + Math.random() * 0.06)
+        });
+        slashPieces.push({
+            x: f.x, y: f.y,
+            vx: f.vx + spread * 0.3,
+            vy: f.vy + 0.8,
+            size: f.size, color: f.color, flip: f.flip,
+            isTop: false,
+            rot: 0, rotSpeed: (0.04 + Math.random() * 0.06)
+        });
+
+        // Score flash
+        flashes.push({ x: f.x, y: f.y, color: f.color, age: 0 });
+        money += 10;
+        moneyEl.innerText = money;
+
+        // Mark fish as gone
+        f.y = 99999;
+    });
+
+    // Visual slash trail
+    slashes.push({ x1: px, y1: py, x2: cx, y2: cy, age: 0 });
+}
+
+function move(e) {
+    const p = getPointer(e);
+    targetX = p.x;
+
+    if (gameState === 'FLY' && prevPointer) {
+        handleSlash(prevPointer.x, prevPointer.y, p.x, p.y);
+    }
+    prevPointer = p;
+}
+
+function pointerEnd() {
+    prevPointer = null;
+}
+
 window.addEventListener('touchstart', move);
 window.addEventListener('touchmove', move);
+window.addEventListener('touchend', pointerEnd);
 window.addEventListener('mousedown', move);
 window.addEventListener('mousemove', move);
+window.addEventListener('mouseup', pointerEnd);
 
 // ─── MAIN LOOP ────────────────────────────────────────────────────────────────
 
@@ -506,10 +604,16 @@ function loop() {
             });
             if (hook.y < 50) {
                 gameState = 'FLY';
+                slashHint.style.display = 'block';
+                slashPieces = [];
+                prevPointer = null;
                 caughtFishes.forEach(f => {
-                    f.x = width / 2; f.y = height - 50;
-                    f.vx = (Math.random() - 0.5) * 5;
-                    f.vy = -Math.random() * 5 - 3;
+                    f.x = width * 0.2 + Math.random() * width * 0.6;
+                    f.y = height * 0.6 + Math.random() * height * 0.2;
+                    // Slow, gentle arcs — stay on screen longer
+                    f.vx = (Math.random() - 0.5) * 2.5;
+                    f.vy = -Math.random() * 2 - 0.8;
+                    f.flip = f.vx < 0;
                 });
             }
         }
@@ -517,7 +621,6 @@ function loop() {
         ctx.save();
         ctx.translate(0, -hook.y + height / 2);
 
-        // Atmosphere layers
         drawLightRays();
         drawCorals();
         drawSeaweeds();
@@ -526,7 +629,6 @@ function loop() {
         drawBoat();
         updateFlashes();
 
-        // Fish
         fishes.forEach(f => {
             if (!f.caught) {
                 f.x += f.speed;
@@ -536,34 +638,60 @@ function loop() {
             }
         });
 
-        // Line from rod tip to hook
         const rodTipX = width / 2 + ROD_TIP_OFFSET_X;
-        const rodTipY = -80 + ROD_TIP_Y + 80; // = ROD_TIP_Y
         ctx.strokeStyle = 'rgba(200, 225, 255, 0.7)';
         ctx.lineWidth = 1.2;
         ctx.shadowBlur = 0;
         drawWavyLine(rodTipX, ROD_TIP_Y, hook.x, hook.y);
-
         drawHook(hook.x, hook.y);
 
         ctx.restore();
     }
 
     if (gameState === 'FLY') {
+        // Draw slash trails (screen space, no translate)
+        updateSlashes();
+        updateFlashes();
+
         let active = 0;
+
+        // Draw whole caught fish still in flight
         caughtFishes.forEach(f => {
-            f.x += f.vx; f.y += f.vy; f.vy += 0.04;
-            if (f.y < height + 100) {
-                drawFish(f.x, f.y, f.size, f.color, f.vx < 0);
+            if (f.y > height + 200) return;
+            f.x += f.vx;
+            f.y += f.vy;
+            f.vy += 0.018; // gentle gravity
+            if (f.y < height + 200) {
+                drawFish(f.x, f.y, f.size, f.color, f.flip);
                 active++;
             }
         });
+
+        // Draw split halves
+        slashPieces = slashPieces.filter(p => p.y < height + 200);
+        slashPieces.forEach(p => {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.022;
+            p.rot += p.rotSpeed;
+
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rot);
+            ctx.translate(-p.x, -p.y);
+            drawFishHalf(p);
+            ctx.restore();
+
+            active++;
+        });
+
         if (active === 0) {
+            slashHint.style.display = 'none';
             gameState = 'START';
             msgEl.style.display = 'flex';
             msgEl.innerHTML = `
                 <h1>Gratulujeme Jolano</h1>
-                <p>si výborná rybářka</p>
+                    <p class="sub">si výborná rybářka</p>
                 <p class="sub">CELKOVÉ SKÓRE</p>
                 <p style="font-size:52px;color:#ffee00;text-shadow:0 0 16px #ffee00;margin:10px 0 40px;font-family:'Courier New',monospace;letter-spacing:4px;">${money}</p>
                 <button onclick="location.reload()">&#9654; ZNOVU</button>
